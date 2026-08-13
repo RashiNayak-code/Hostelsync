@@ -69,7 +69,7 @@ export function RoleLayout({ role }: { role: Role }) {
   const RoleIcon = roleIcon[role];
   const user = roleUser[role];
   const active = items.filter((i) => pathname === i.to || pathname.startsWith(i.to + "/"));
-  const current = active.length ? active[active.length - 1] : items[0];
+  const current = (active.length ? active[active.length - 1] : items[0])!;
 
   return (
     <div data-role={role} className="min-h-screen bg-background text-foreground">
