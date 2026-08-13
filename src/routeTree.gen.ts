@@ -10,33 +10,466 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as StudentRouteImport } from './routes/student'
+import { Route as WardenRouteImport } from './routes/warden'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
+import { Route as AdminComplaintsRouteImport } from './routes/admin.complaints'
+import { Route as AdminFeesRouteImport } from './routes/admin.fees'
+import { Route as AdminLeaveRouteImport } from './routes/admin.leave'
+import { Route as AdminMessRouteImport } from './routes/admin.mess'
+import { Route as AdminNoticesRouteImport } from './routes/admin.notices'
+import { Route as AdminOutpassRouteImport } from './routes/admin.outpass'
+import { Route as AdminReportsRouteImport } from './routes/admin.reports'
+import { Route as AdminRoomsRouteImport } from './routes/admin.rooms'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminStudentsRouteImport } from './routes/admin.students'
+import { Route as StudentIndexRouteImport } from './routes/student.index'
+import { Route as StudentAttendanceRouteImport } from './routes/student.attendance'
+import { Route as StudentComplaintsRouteImport } from './routes/student.complaints'
+import { Route as StudentFeesRouteImport } from './routes/student.fees'
+import { Route as StudentLeaveRouteImport } from './routes/student.leave'
+import { Route as StudentMessRouteImport } from './routes/student.mess'
+import { Route as StudentOutpassRouteImport } from './routes/student.outpass'
+import { Route as StudentProfileRouteImport } from './routes/student.profile'
+import { Route as StudentRoomRouteImport } from './routes/student.room'
+import { Route as StudentSettingsRouteImport } from './routes/student.settings'
+import { Route as WardenIndexRouteImport } from './routes/warden.index'
+import { Route as WardenAttendanceRouteImport } from './routes/warden.attendance'
+import { Route as WardenComplaintsRouteImport } from './routes/warden.complaints'
+import { Route as WardenLeaveRouteImport } from './routes/warden.leave'
+import { Route as WardenMessRouteImport } from './routes/warden.mess'
+import { Route as WardenNoticesRouteImport } from './routes/warden.notices'
+import { Route as WardenOutpassRouteImport } from './routes/warden.outpass'
+import { Route as WardenReportsRouteImport } from './routes/warden.reports'
+import { Route as WardenRoomsRouteImport } from './routes/warden.rooms'
+import { Route as WardenSettingsRouteImport } from './routes/warden.settings'
+import { Route as WardenStudentsRouteImport } from './routes/warden.students'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudentRoute = StudentRouteImport.update({
+  id: '/student',
+  path: '/student',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WardenRoute = WardenRouteImport.update({
+  id: '/warden',
+  path: '/warden',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAttendanceRoute = AdminAttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminComplaintsRoute = AdminComplaintsRouteImport.update({
+  id: '/complaints',
+  path: '/complaints',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFeesRoute = AdminFeesRouteImport.update({
+  id: '/fees',
+  path: '/fees',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminLeaveRoute = AdminLeaveRouteImport.update({
+  id: '/leave',
+  path: '/leave',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminMessRoute = AdminMessRouteImport.update({
+  id: '/mess',
+  path: '/mess',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminNoticesRoute = AdminNoticesRouteImport.update({
+  id: '/notices',
+  path: '/notices',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminOutpassRoute = AdminOutpassRouteImport.update({
+  id: '/outpass',
+  path: '/outpass',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminRoomsRoute = AdminRoomsRouteImport.update({
+  id: '/rooms',
+  path: '/rooms',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminStudentsRoute = AdminStudentsRouteImport.update({
+  id: '/students',
+  path: '/students',
+  getParentRoute: () => AdminRoute,
+} as any)
+const StudentIndexRoute = StudentIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => StudentRoute,
+} as any)
+const StudentAttendanceRoute = StudentAttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
+  getParentRoute: () => StudentRoute,
+} as any)
+const StudentComplaintsRoute = StudentComplaintsRouteImport.update({
+  id: '/complaints',
+  path: '/complaints',
+  getParentRoute: () => StudentRoute,
+} as any)
+const StudentFeesRoute = StudentFeesRouteImport.update({
+  id: '/fees',
+  path: '/fees',
+  getParentRoute: () => StudentRoute,
+} as any)
+const StudentLeaveRoute = StudentLeaveRouteImport.update({
+  id: '/leave',
+  path: '/leave',
+  getParentRoute: () => StudentRoute,
+} as any)
+const StudentMessRoute = StudentMessRouteImport.update({
+  id: '/mess',
+  path: '/mess',
+  getParentRoute: () => StudentRoute,
+} as any)
+const StudentOutpassRoute = StudentOutpassRouteImport.update({
+  id: '/outpass',
+  path: '/outpass',
+  getParentRoute: () => StudentRoute,
+} as any)
+const StudentProfileRoute = StudentProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => StudentRoute,
+} as any)
+const StudentRoomRoute = StudentRoomRouteImport.update({
+  id: '/room',
+  path: '/room',
+  getParentRoute: () => StudentRoute,
+} as any)
+const StudentSettingsRoute = StudentSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => StudentRoute,
+} as any)
+const WardenIndexRoute = WardenIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => WardenRoute,
+} as any)
+const WardenAttendanceRoute = WardenAttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
+  getParentRoute: () => WardenRoute,
+} as any)
+const WardenComplaintsRoute = WardenComplaintsRouteImport.update({
+  id: '/complaints',
+  path: '/complaints',
+  getParentRoute: () => WardenRoute,
+} as any)
+const WardenLeaveRoute = WardenLeaveRouteImport.update({
+  id: '/leave',
+  path: '/leave',
+  getParentRoute: () => WardenRoute,
+} as any)
+const WardenMessRoute = WardenMessRouteImport.update({
+  id: '/mess',
+  path: '/mess',
+  getParentRoute: () => WardenRoute,
+} as any)
+const WardenNoticesRoute = WardenNoticesRouteImport.update({
+  id: '/notices',
+  path: '/notices',
+  getParentRoute: () => WardenRoute,
+} as any)
+const WardenOutpassRoute = WardenOutpassRouteImport.update({
+  id: '/outpass',
+  path: '/outpass',
+  getParentRoute: () => WardenRoute,
+} as any)
+const WardenReportsRoute = WardenReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => WardenRoute,
+} as any)
+const WardenRoomsRoute = WardenRoomsRouteImport.update({
+  id: '/rooms',
+  path: '/rooms',
+  getParentRoute: () => WardenRoute,
+} as any)
+const WardenSettingsRoute = WardenSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => WardenRoute,
+} as any)
+const WardenStudentsRoute = WardenStudentsRouteImport.update({
+  id: '/students',
+  path: '/students',
+  getParentRoute: () => WardenRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/student': typeof StudentRouteWithChildren
+  '/warden': typeof WardenRouteWithChildren
+  '/admin/attendance': typeof AdminAttendanceRoute
+  '/admin/complaints': typeof AdminComplaintsRoute
+  '/admin/fees': typeof AdminFeesRoute
+  '/admin/leave': typeof AdminLeaveRoute
+  '/admin/mess': typeof AdminMessRoute
+  '/admin/notices': typeof AdminNoticesRoute
+  '/admin/outpass': typeof AdminOutpassRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/rooms': typeof AdminRoomsRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/students': typeof AdminStudentsRoute
+  '/student/attendance': typeof StudentAttendanceRoute
+  '/student/complaints': typeof StudentComplaintsRoute
+  '/student/fees': typeof StudentFeesRoute
+  '/student/leave': typeof StudentLeaveRoute
+  '/student/mess': typeof StudentMessRoute
+  '/student/outpass': typeof StudentOutpassRoute
+  '/student/profile': typeof StudentProfileRoute
+  '/student/room': typeof StudentRoomRoute
+  '/student/settings': typeof StudentSettingsRoute
+  '/warden/attendance': typeof WardenAttendanceRoute
+  '/warden/complaints': typeof WardenComplaintsRoute
+  '/warden/leave': typeof WardenLeaveRoute
+  '/warden/mess': typeof WardenMessRoute
+  '/warden/notices': typeof WardenNoticesRoute
+  '/warden/outpass': typeof WardenOutpassRoute
+  '/warden/reports': typeof WardenReportsRoute
+  '/warden/rooms': typeof WardenRoomsRoute
+  '/warden/settings': typeof WardenSettingsRoute
+  '/warden/students': typeof WardenStudentsRoute
+  '/admin/': typeof AdminIndexRoute
+  '/student/': typeof StudentIndexRoute
+  '/warden/': typeof WardenIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin/attendance': typeof AdminAttendanceRoute
+  '/admin/complaints': typeof AdminComplaintsRoute
+  '/admin/fees': typeof AdminFeesRoute
+  '/admin/leave': typeof AdminLeaveRoute
+  '/admin/mess': typeof AdminMessRoute
+  '/admin/notices': typeof AdminNoticesRoute
+  '/admin/outpass': typeof AdminOutpassRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/rooms': typeof AdminRoomsRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/students': typeof AdminStudentsRoute
+  '/student/attendance': typeof StudentAttendanceRoute
+  '/student/complaints': typeof StudentComplaintsRoute
+  '/student/fees': typeof StudentFeesRoute
+  '/student/leave': typeof StudentLeaveRoute
+  '/student/mess': typeof StudentMessRoute
+  '/student/outpass': typeof StudentOutpassRoute
+  '/student/profile': typeof StudentProfileRoute
+  '/student/room': typeof StudentRoomRoute
+  '/student/settings': typeof StudentSettingsRoute
+  '/warden/attendance': typeof WardenAttendanceRoute
+  '/warden/complaints': typeof WardenComplaintsRoute
+  '/warden/leave': typeof WardenLeaveRoute
+  '/warden/mess': typeof WardenMessRoute
+  '/warden/notices': typeof WardenNoticesRoute
+  '/warden/outpass': typeof WardenOutpassRoute
+  '/warden/reports': typeof WardenReportsRoute
+  '/warden/rooms': typeof WardenRoomsRoute
+  '/warden/settings': typeof WardenSettingsRoute
+  '/warden/students': typeof WardenStudentsRoute
+  '/admin': typeof AdminIndexRoute
+  '/student': typeof StudentIndexRoute
+  '/warden': typeof WardenIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/student': typeof StudentRouteWithChildren
+  '/warden': typeof WardenRouteWithChildren
+  '/admin/attendance': typeof AdminAttendanceRoute
+  '/admin/complaints': typeof AdminComplaintsRoute
+  '/admin/fees': typeof AdminFeesRoute
+  '/admin/leave': typeof AdminLeaveRoute
+  '/admin/mess': typeof AdminMessRoute
+  '/admin/notices': typeof AdminNoticesRoute
+  '/admin/outpass': typeof AdminOutpassRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/rooms': typeof AdminRoomsRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/students': typeof AdminStudentsRoute
+  '/student/attendance': typeof StudentAttendanceRoute
+  '/student/complaints': typeof StudentComplaintsRoute
+  '/student/fees': typeof StudentFeesRoute
+  '/student/leave': typeof StudentLeaveRoute
+  '/student/mess': typeof StudentMessRoute
+  '/student/outpass': typeof StudentOutpassRoute
+  '/student/profile': typeof StudentProfileRoute
+  '/student/room': typeof StudentRoomRoute
+  '/student/settings': typeof StudentSettingsRoute
+  '/warden/attendance': typeof WardenAttendanceRoute
+  '/warden/complaints': typeof WardenComplaintsRoute
+  '/warden/leave': typeof WardenLeaveRoute
+  '/warden/mess': typeof WardenMessRoute
+  '/warden/notices': typeof WardenNoticesRoute
+  '/warden/outpass': typeof WardenOutpassRoute
+  '/warden/reports': typeof WardenReportsRoute
+  '/warden/rooms': typeof WardenRoomsRoute
+  '/warden/settings': typeof WardenSettingsRoute
+  '/warden/students': typeof WardenStudentsRoute
+  '/admin/': typeof AdminIndexRoute
+  '/student/': typeof StudentIndexRoute
+  '/warden/': typeof WardenIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/student'
+    | '/warden'
+    | '/admin/attendance'
+    | '/admin/complaints'
+    | '/admin/fees'
+    | '/admin/leave'
+    | '/admin/mess'
+    | '/admin/notices'
+    | '/admin/outpass'
+    | '/admin/reports'
+    | '/admin/rooms'
+    | '/admin/settings'
+    | '/admin/students'
+    | '/student/attendance'
+    | '/student/complaints'
+    | '/student/fees'
+    | '/student/leave'
+    | '/student/mess'
+    | '/student/outpass'
+    | '/student/profile'
+    | '/student/room'
+    | '/student/settings'
+    | '/warden/attendance'
+    | '/warden/complaints'
+    | '/warden/leave'
+    | '/warden/mess'
+    | '/warden/notices'
+    | '/warden/outpass'
+    | '/warden/reports'
+    | '/warden/rooms'
+    | '/warden/settings'
+    | '/warden/students'
+    | '/admin/'
+    | '/student/'
+    | '/warden/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/admin/attendance'
+    | '/admin/complaints'
+    | '/admin/fees'
+    | '/admin/leave'
+    | '/admin/mess'
+    | '/admin/notices'
+    | '/admin/outpass'
+    | '/admin/reports'
+    | '/admin/rooms'
+    | '/admin/settings'
+    | '/admin/students'
+    | '/student/attendance'
+    | '/student/complaints'
+    | '/student/fees'
+    | '/student/leave'
+    | '/student/mess'
+    | '/student/outpass'
+    | '/student/profile'
+    | '/student/room'
+    | '/student/settings'
+    | '/warden/attendance'
+    | '/warden/complaints'
+    | '/warden/leave'
+    | '/warden/mess'
+    | '/warden/notices'
+    | '/warden/outpass'
+    | '/warden/reports'
+    | '/warden/rooms'
+    | '/warden/settings'
+    | '/warden/students'
+    | '/admin'
+    | '/student'
+    | '/warden'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/student'
+    | '/warden'
+    | '/admin/attendance'
+    | '/admin/complaints'
+    | '/admin/fees'
+    | '/admin/leave'
+    | '/admin/mess'
+    | '/admin/notices'
+    | '/admin/outpass'
+    | '/admin/reports'
+    | '/admin/rooms'
+    | '/admin/settings'
+    | '/admin/students'
+    | '/student/attendance'
+    | '/student/complaints'
+    | '/student/fees'
+    | '/student/leave'
+    | '/student/mess'
+    | '/student/outpass'
+    | '/student/profile'
+    | '/student/room'
+    | '/student/settings'
+    | '/warden/attendance'
+    | '/warden/complaints'
+    | '/warden/leave'
+    | '/warden/mess'
+    | '/warden/notices'
+    | '/warden/outpass'
+    | '/warden/reports'
+    | '/warden/rooms'
+    | '/warden/settings'
+    | '/warden/students'
+    | '/admin/'
+    | '/student/'
+    | '/warden/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
+  StudentRoute: typeof StudentRouteWithChildren
+  WardenRoute: typeof WardenRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +481,358 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/student': {
+      id: '/student'
+      path: '/student'
+      fullPath: '/student'
+      preLoaderRoute: typeof StudentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/warden': {
+      id: '/warden'
+      path: '/warden'
+      fullPath: '/warden'
+      preLoaderRoute: typeof WardenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/attendance': {
+      id: '/admin/attendance'
+      path: '/attendance'
+      fullPath: '/admin/attendance'
+      preLoaderRoute: typeof AdminAttendanceRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/complaints': {
+      id: '/admin/complaints'
+      path: '/complaints'
+      fullPath: '/admin/complaints'
+      preLoaderRoute: typeof AdminComplaintsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/fees': {
+      id: '/admin/fees'
+      path: '/fees'
+      fullPath: '/admin/fees'
+      preLoaderRoute: typeof AdminFeesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/leave': {
+      id: '/admin/leave'
+      path: '/leave'
+      fullPath: '/admin/leave'
+      preLoaderRoute: typeof AdminLeaveRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/mess': {
+      id: '/admin/mess'
+      path: '/mess'
+      fullPath: '/admin/mess'
+      preLoaderRoute: typeof AdminMessRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/notices': {
+      id: '/admin/notices'
+      path: '/notices'
+      fullPath: '/admin/notices'
+      preLoaderRoute: typeof AdminNoticesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/outpass': {
+      id: '/admin/outpass'
+      path: '/outpass'
+      fullPath: '/admin/outpass'
+      preLoaderRoute: typeof AdminOutpassRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/rooms': {
+      id: '/admin/rooms'
+      path: '/rooms'
+      fullPath: '/admin/rooms'
+      preLoaderRoute: typeof AdminRoomsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/students': {
+      id: '/admin/students'
+      path: '/students'
+      fullPath: '/admin/students'
+      preLoaderRoute: typeof AdminStudentsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/student/': {
+      id: '/student/'
+      path: '/'
+      fullPath: '/student/'
+      preLoaderRoute: typeof StudentIndexRouteImport
+      parentRoute: typeof StudentRoute
+    }
+    '/student/attendance': {
+      id: '/student/attendance'
+      path: '/attendance'
+      fullPath: '/student/attendance'
+      preLoaderRoute: typeof StudentAttendanceRouteImport
+      parentRoute: typeof StudentRoute
+    }
+    '/student/complaints': {
+      id: '/student/complaints'
+      path: '/complaints'
+      fullPath: '/student/complaints'
+      preLoaderRoute: typeof StudentComplaintsRouteImport
+      parentRoute: typeof StudentRoute
+    }
+    '/student/fees': {
+      id: '/student/fees'
+      path: '/fees'
+      fullPath: '/student/fees'
+      preLoaderRoute: typeof StudentFeesRouteImport
+      parentRoute: typeof StudentRoute
+    }
+    '/student/leave': {
+      id: '/student/leave'
+      path: '/leave'
+      fullPath: '/student/leave'
+      preLoaderRoute: typeof StudentLeaveRouteImport
+      parentRoute: typeof StudentRoute
+    }
+    '/student/mess': {
+      id: '/student/mess'
+      path: '/mess'
+      fullPath: '/student/mess'
+      preLoaderRoute: typeof StudentMessRouteImport
+      parentRoute: typeof StudentRoute
+    }
+    '/student/outpass': {
+      id: '/student/outpass'
+      path: '/outpass'
+      fullPath: '/student/outpass'
+      preLoaderRoute: typeof StudentOutpassRouteImport
+      parentRoute: typeof StudentRoute
+    }
+    '/student/profile': {
+      id: '/student/profile'
+      path: '/profile'
+      fullPath: '/student/profile'
+      preLoaderRoute: typeof StudentProfileRouteImport
+      parentRoute: typeof StudentRoute
+    }
+    '/student/room': {
+      id: '/student/room'
+      path: '/room'
+      fullPath: '/student/room'
+      preLoaderRoute: typeof StudentRoomRouteImport
+      parentRoute: typeof StudentRoute
+    }
+    '/student/settings': {
+      id: '/student/settings'
+      path: '/settings'
+      fullPath: '/student/settings'
+      preLoaderRoute: typeof StudentSettingsRouteImport
+      parentRoute: typeof StudentRoute
+    }
+    '/warden/': {
+      id: '/warden/'
+      path: '/'
+      fullPath: '/warden/'
+      preLoaderRoute: typeof WardenIndexRouteImport
+      parentRoute: typeof WardenRoute
+    }
+    '/warden/attendance': {
+      id: '/warden/attendance'
+      path: '/attendance'
+      fullPath: '/warden/attendance'
+      preLoaderRoute: typeof WardenAttendanceRouteImport
+      parentRoute: typeof WardenRoute
+    }
+    '/warden/complaints': {
+      id: '/warden/complaints'
+      path: '/complaints'
+      fullPath: '/warden/complaints'
+      preLoaderRoute: typeof WardenComplaintsRouteImport
+      parentRoute: typeof WardenRoute
+    }
+    '/warden/leave': {
+      id: '/warden/leave'
+      path: '/leave'
+      fullPath: '/warden/leave'
+      preLoaderRoute: typeof WardenLeaveRouteImport
+      parentRoute: typeof WardenRoute
+    }
+    '/warden/mess': {
+      id: '/warden/mess'
+      path: '/mess'
+      fullPath: '/warden/mess'
+      preLoaderRoute: typeof WardenMessRouteImport
+      parentRoute: typeof WardenRoute
+    }
+    '/warden/notices': {
+      id: '/warden/notices'
+      path: '/notices'
+      fullPath: '/warden/notices'
+      preLoaderRoute: typeof WardenNoticesRouteImport
+      parentRoute: typeof WardenRoute
+    }
+    '/warden/outpass': {
+      id: '/warden/outpass'
+      path: '/outpass'
+      fullPath: '/warden/outpass'
+      preLoaderRoute: typeof WardenOutpassRouteImport
+      parentRoute: typeof WardenRoute
+    }
+    '/warden/reports': {
+      id: '/warden/reports'
+      path: '/reports'
+      fullPath: '/warden/reports'
+      preLoaderRoute: typeof WardenReportsRouteImport
+      parentRoute: typeof WardenRoute
+    }
+    '/warden/rooms': {
+      id: '/warden/rooms'
+      path: '/rooms'
+      fullPath: '/warden/rooms'
+      preLoaderRoute: typeof WardenRoomsRouteImport
+      parentRoute: typeof WardenRoute
+    }
+    '/warden/settings': {
+      id: '/warden/settings'
+      path: '/settings'
+      fullPath: '/warden/settings'
+      preLoaderRoute: typeof WardenSettingsRouteImport
+      parentRoute: typeof WardenRoute
+    }
+    '/warden/students': {
+      id: '/warden/students'
+      path: '/students'
+      fullPath: '/warden/students'
+      preLoaderRoute: typeof WardenStudentsRouteImport
+      parentRoute: typeof WardenRoute
+    }
   }
 }
 
+interface AdminRouteChildren {
+  AdminAttendanceRoute: typeof AdminAttendanceRoute
+  AdminComplaintsRoute: typeof AdminComplaintsRoute
+  AdminFeesRoute: typeof AdminFeesRoute
+  AdminLeaveRoute: typeof AdminLeaveRoute
+  AdminMessRoute: typeof AdminMessRoute
+  AdminNoticesRoute: typeof AdminNoticesRoute
+  AdminOutpassRoute: typeof AdminOutpassRoute
+  AdminReportsRoute: typeof AdminReportsRoute
+  AdminRoomsRoute: typeof AdminRoomsRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminStudentsRoute: typeof AdminStudentsRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminAttendanceRoute: AdminAttendanceRoute,
+  AdminComplaintsRoute: AdminComplaintsRoute,
+  AdminFeesRoute: AdminFeesRoute,
+  AdminLeaveRoute: AdminLeaveRoute,
+  AdminMessRoute: AdminMessRoute,
+  AdminNoticesRoute: AdminNoticesRoute,
+  AdminOutpassRoute: AdminOutpassRoute,
+  AdminReportsRoute: AdminReportsRoute,
+  AdminRoomsRoute: AdminRoomsRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminStudentsRoute: AdminStudentsRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface StudentRouteChildren {
+  StudentAttendanceRoute: typeof StudentAttendanceRoute
+  StudentComplaintsRoute: typeof StudentComplaintsRoute
+  StudentFeesRoute: typeof StudentFeesRoute
+  StudentLeaveRoute: typeof StudentLeaveRoute
+  StudentMessRoute: typeof StudentMessRoute
+  StudentOutpassRoute: typeof StudentOutpassRoute
+  StudentProfileRoute: typeof StudentProfileRoute
+  StudentRoomRoute: typeof StudentRoomRoute
+  StudentSettingsRoute: typeof StudentSettingsRoute
+  StudentIndexRoute: typeof StudentIndexRoute
+}
+
+const StudentRouteChildren: StudentRouteChildren = {
+  StudentAttendanceRoute: StudentAttendanceRoute,
+  StudentComplaintsRoute: StudentComplaintsRoute,
+  StudentFeesRoute: StudentFeesRoute,
+  StudentLeaveRoute: StudentLeaveRoute,
+  StudentMessRoute: StudentMessRoute,
+  StudentOutpassRoute: StudentOutpassRoute,
+  StudentProfileRoute: StudentProfileRoute,
+  StudentRoomRoute: StudentRoomRoute,
+  StudentSettingsRoute: StudentSettingsRoute,
+  StudentIndexRoute: StudentIndexRoute,
+}
+
+const StudentRouteWithChildren =
+  StudentRoute._addFileChildren(StudentRouteChildren)
+
+interface WardenRouteChildren {
+  WardenAttendanceRoute: typeof WardenAttendanceRoute
+  WardenComplaintsRoute: typeof WardenComplaintsRoute
+  WardenLeaveRoute: typeof WardenLeaveRoute
+  WardenMessRoute: typeof WardenMessRoute
+  WardenNoticesRoute: typeof WardenNoticesRoute
+  WardenOutpassRoute: typeof WardenOutpassRoute
+  WardenReportsRoute: typeof WardenReportsRoute
+  WardenRoomsRoute: typeof WardenRoomsRoute
+  WardenSettingsRoute: typeof WardenSettingsRoute
+  WardenStudentsRoute: typeof WardenStudentsRoute
+  WardenIndexRoute: typeof WardenIndexRoute
+}
+
+const WardenRouteChildren: WardenRouteChildren = {
+  WardenAttendanceRoute: WardenAttendanceRoute,
+  WardenComplaintsRoute: WardenComplaintsRoute,
+  WardenLeaveRoute: WardenLeaveRoute,
+  WardenMessRoute: WardenMessRoute,
+  WardenNoticesRoute: WardenNoticesRoute,
+  WardenOutpassRoute: WardenOutpassRoute,
+  WardenReportsRoute: WardenReportsRoute,
+  WardenRoomsRoute: WardenRoomsRoute,
+  WardenSettingsRoute: WardenSettingsRoute,
+  WardenStudentsRoute: WardenStudentsRoute,
+  WardenIndexRoute: WardenIndexRoute,
+}
+
+const WardenRouteWithChildren =
+  WardenRoute._addFileChildren(WardenRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
+  StudentRoute: StudentRouteWithChildren,
+  WardenRoute: WardenRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
