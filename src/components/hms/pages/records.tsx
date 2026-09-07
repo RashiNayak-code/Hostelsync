@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { DataTable, type Column } from "@/components/hms/DataTable";
 import { DonutProgress } from "@/components/hms/DonutProgress";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import { PageHeader, Panel, StatCard, StatusBadge, ProgressBar } from "@/components/hms/ui-kit";
 import {
   attendance, complaints, currentStudent, fees, feeCollection, inr, leaves, outpasses,
@@ -55,7 +56,9 @@ function ActionCell({ labels }: { labels: string[] }) {
 
 /* ---------------- Fees ---------------- */
 export function FeesPage({ role }: { role: Role }) {
-  const rows = isStudent(role) ? fees.filter((f) => f.student === currentStudent.name) : fees;
+  const [feeRows, setFeeRows] = usePersistentState("hotelsync-fees", fees);
+  const [remindedFees, setRemindedFees] = useState<string[]>([]);
+  const rows = isStudent(role) ? feeRows.filter((f) => f.student === currentStudent.name) : feeRows;
   const cols: Column<(typeof fees)[number]>[] = [
     { key: "id", header: "Invoice", render: (r) => <span className="font-medium">{r.id}</span> },
     ...(isStudent(role) ? [] : [{ key: "student", header: "Student", render: (r: (typeof fees)[number]) => (
@@ -66,7 +69,32 @@ export function FeesPage({ role }: { role: Role }) {
     { key: "paid", header: "Paid", render: (r) => <div className="w-28"><p className="mb-1 text-xs">{inr(r.paid)}</p><ProgressBar value={(r.paid / r.amount) * 100} /></div> },
     { key: "dueDate", header: "Due date", render: (r) => r.dueDate },
     { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
-    { key: "action", header: "", render: () => <ActionCell labels={isStudent(role) ? ["Pay now"] : ["Mark paid", "Remind"]} /> },
+    {
+      key: "action",
+      header: "",
+      render: (r) => isStudent(role) ? (
+        <ActionCell labels={["Pay now"]} />
+      ) : r.status === "Paid" ? (
+        <span className="text-xs text-muted-foreground">Paid</span>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={btnRole}
+            onClick={() => setFeeRows((prev) => prev.map((item) => item.id === r.id ? { ...item, paid: item.amount, status: "Paid" } : item))}
+          >
+            Mark paid
+          </button>
+          <button
+            type="button"
+            className={btn}
+            onClick={() => setRemindedFees((prev) => prev.includes(r.id) ? prev : [...prev, r.id])}
+          >
+            {remindedFees.includes(r.id) ? "Reminder sent" : "Remind"}
+          </button>
+        </div>
+      ),
+    },
   ];
   const due = rows.reduce((a, f) => a + (f.amount - f.paid), 0);
   const paid = rows.reduce((a, f) => a + f.paid, 0);
@@ -102,7 +130,7 @@ export function FeesPage({ role }: { role: Role }) {
 
 /* ---------------- Complaints ---------------- */
 export function ComplaintsPage({ role }: { role: Role }) {
-  const [complaintRows, setComplaintRows] = useState(complaints);
+  const [complaintRows, setComplaintRows] = usePersistentState("hotelsync-complaints", complaints);
   const [form, setForm] = useState({
     category: "Water" as (typeof complaints)[number]["category"],
     roomNo: currentStudent.roomNo,
@@ -138,14 +166,39 @@ export function ComplaintsPage({ role }: { role: Role }) {
   const rows = isStudent(role) ? complaintRows.filter((c) => c.student === currentStudent.name) : complaintRows;
   const cols: Column<(typeof complaints)[number]>[] = [
     { key: "id", header: "Ticket", render: (r) => <span className="font-medium">{r.id}</span> },
-    ...(isStudent(role) ? [] : [{ key: "student", header: "Student", render: (r: (typeof complaints)[number]) => (
+    ...(role === "admin" ? [{ key: "student", header: "Student", render: (r: (typeof complaints)[number]) => (
       <div><p className="font-medium">{r.student}</p><p className="text-xs text-muted-foreground">Room {r.roomNo}</p></div>
-    ) }]),
+    ) }] : []),
     { key: "category", header: "Category", render: (r) => r.category },
     { key: "description", header: "Description", render: (r) => <p className="max-w-sm text-muted-foreground">{r.description}</p> },
     { key: "raisedAt", header: "Raised", render: (r) => r.raisedAt },
     { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
-    { key: "action", header: "", render: () => <ActionCell labels={isStudent(role) ? ["View"] : ["In progress", "Resolve"]} /> },
+    {
+      key: "action",
+      header: "",
+      render: (r) => isStudent(role) ? (
+        <ActionCell labels={["View"]} />
+      ) : r.status === "Resolved" ? (
+        <span className="text-xs text-muted-foreground">Resolved</span>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={btn}
+            onClick={() => setComplaintRows((prev) => prev.map((item) => item.id === r.id ? { ...item, status: "In Progress" } : item))}
+          >
+            In progress
+          </button>
+          <button
+            type="button"
+            className={btnRole}
+            onClick={() => setComplaintRows((prev) => prev.map((item) => item.id === r.id ? { ...item, status: "Resolved" } : item))}
+          >
+            Resolve
+          </button>
+        </div>
+      ),
+    },
   ];
 
   const handleSubmitComplaint = () => {
@@ -241,7 +294,7 @@ export function ComplaintsPage({ role }: { role: Role }) {
 
 /* ---------------- Outpass ---------------- */
 export function OutpassPage({ role }: { role: Role }) {
-  const [outpassRows, setOutpassRows] = useState(outpasses);
+  const [outpassRows, setOutpassRows] = usePersistentState("hotelsync-outpasses", outpasses);
   const [form, setForm] = useState({
     departure: "",
     expectedReturn: "",
@@ -294,8 +347,25 @@ export function OutpassPage({ role }: { role: Role }) {
         >
           Cancel
         </button>
+      ) : r.status === "Pending" ? (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={btnRole}
+            onClick={() => setOutpassRows((prev) => prev.map((item) => item.id === r.id ? { ...item, status: "Approved" } : item))}
+          >
+            Approve
+          </button>
+          <button
+            type="button"
+            className={btn}
+            onClick={() => setOutpassRows((prev) => prev.map((item) => item.id === r.id ? { ...item, status: "Rejected" } : item))}
+          >
+            Reject
+          </button>
+        </div>
       ) : (
-        <ActionCell labels={["Approve", "Reject"]} />
+        <span className="text-xs text-muted-foreground">{r.status}</span>
       ),
     },
   ];
@@ -351,7 +421,7 @@ export function OutpassPage({ role }: { role: Role }) {
                 type="datetime-local"
                 value={form.departure}
                 onChange={(event) => setForm((prev) => ({ ...prev, departure: event.target.value }))}
-                className="h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
+                className="outpass-date-input h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
               />
             </label>
             <label className="text-sm"><span className="mb-1.5 block text-muted-foreground">Expected return</span>
@@ -359,7 +429,7 @@ export function OutpassPage({ role }: { role: Role }) {
                 type="datetime-local"
                 value={form.expectedReturn}
                 onChange={(event) => setForm((prev) => ({ ...prev, expectedReturn: event.target.value }))}
-                className="h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
+                className="outpass-date-input h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
               />
             </label>
             <label className="text-sm"><span className="mb-1.5 block text-muted-foreground">Reason</span>
@@ -381,7 +451,7 @@ export function OutpassPage({ role }: { role: Role }) {
 
 /* ---------------- Leave ---------------- */
 export function LeavePage({ role }: { role: Role }) {
-  const [leaveRows, setLeaveRows] = useState(leaves);
+  const [leaveRows, setLeaveRows] = usePersistentState("hotelsync-leaves", leaves);
   const [form, setForm] = useState({
     from: "",
     to: "",
@@ -396,7 +466,32 @@ export function LeavePage({ role }: { role: Role }) {
     { key: "to", header: "To", render: (r) => r.to },
     { key: "reason", header: "Reason", render: (r) => r.reason },
     { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
-    { key: "action", header: "", render: () => <ActionCell labels={isStudent(role) ? ["Withdraw"] : ["Approve", "Reject"]} /> },
+    {
+      key: "action",
+      header: "",
+      render: (r) => isStudent(role) ? (
+        <ActionCell labels={["Withdraw"]} />
+      ) : r.status === "Pending" ? (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={btnRole}
+            onClick={() => setLeaveRows((prev) => prev.map((item) => item.id === r.id ? { ...item, status: "Approved" } : item))}
+          >
+            Approve
+          </button>
+          <button
+            type="button"
+            className={btn}
+            onClick={() => setLeaveRows((prev) => prev.map((item) => item.id === r.id ? { ...item, status: "Rejected" } : item))}
+          >
+            Reject
+          </button>
+        </div>
+      ) : (
+        <span className="text-xs text-muted-foreground">{r.status}</span>
+      ),
+    },
   ];
 
   const handleSubmitLeave = () => {
@@ -466,7 +561,7 @@ export function LeavePage({ role }: { role: Role }) {
 
 /* ---------------- Attendance ---------------- */
 export function AttendancePage({ role }: { role: Role }) {
-  const [attendanceRows, setAttendanceRows] = useState(attendance);
+  const [attendanceRows, setAttendanceRows] = usePersistentState("hotelsync-attendance", attendance);
 
   const handleMarkTodayBulk = () => {
     setAttendanceRows((prev) => prev.map((row) => ({ ...row, status: "Present" })));
@@ -480,7 +575,35 @@ export function AttendancePage({ role }: { role: Role }) {
     ) }]),
     { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
     { key: "markedBy", header: "Marked by", render: (r) => r.markedBy },
-    ...(isStudent(role) ? [] : [{ key: "action", header: "", render: () => <ActionCell labels={["Present", "Absent", "Leave"]} /> }]),
+    ...(role === "warden" ? [{
+      key: "action",
+      header: "",
+      render: (r: (typeof attendance)[number]) => (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={btn}
+            onClick={() => setAttendanceRows((prev) => prev.map((row) => row.date === r.date && row.student === r.student ? { ...row, status: "Present" } : row))}
+          >
+            Present
+          </button>
+          <button
+            type="button"
+            className={btn}
+            onClick={() => setAttendanceRows((prev) => prev.map((row) => row.date === r.date && row.student === r.student ? { ...row, status: "Absent" } : row))}
+          >
+            Absent
+          </button>
+          <button
+            type="button"
+            className={btn}
+            onClick={() => setAttendanceRows((prev) => prev.map((row) => row.date === r.date && row.student === r.student ? { ...row, status: "Leave" } : row))}
+          >
+            Leave
+          </button>
+        </div>
+      ),
+    }] : []),
   ];
   const present = rows.filter((r) => r.status === "Present").length;
   return (
@@ -503,7 +626,8 @@ export function AttendancePage({ role }: { role: Role }) {
 /* ---------------- Students ---------------- */
 export function StudentsPage({ role }: { role: Role }) {
   const readOnly = role === "warden";
-  const [studentRows, setStudentRows] = useState(students);
+  const [studentRows, setStudentRows] = usePersistentState("hotelsync-students", students);
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     rollNo: "",
@@ -525,7 +649,41 @@ export function StudentsPage({ role }: { role: Role }) {
     { key: "roomNo", header: "Room", render: (r) => r.roomNo },
     { key: "phone", header: "Phone", render: (r) => r.phone },
     { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
-    { key: "action", header: "", render: () => <ActionCell labels={readOnly ? ["View"] : ["Edit", "Remove"]} /> },
+    {
+      key: "action",
+      header: "",
+      render: (r) => readOnly ? (
+        <ActionCell labels={["View"]} />
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={btn}
+            onClick={() => {
+              setEditingStudentId(r.id);
+              setForm({
+                name: r.name,
+                rollNo: r.rollNo,
+                course: r.course,
+                year: r.year,
+                roomNo: r.roomNo,
+                phone: r.phone,
+                status: r.status,
+              });
+            }}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            className={btn}
+            onClick={() => setStudentRows((prev) => prev.filter((student) => student.id !== r.id))}
+          >
+            Remove
+          </button>
+        </div>
+      ),
+    },
   ];
 
   const handleAddStudent = () => {
@@ -539,8 +697,7 @@ export function StudentsPage({ role }: { role: Role }) {
       return;
     }
 
-    const newStudent: (typeof students)[number] = {
-      id: `S-${Date.now().toString().slice(-4)}`,
+    const studentDetails = {
       name,
       rollNo,
       course,
@@ -550,7 +707,12 @@ export function StudentsPage({ role }: { role: Role }) {
       phone,
     };
 
-    setStudentRows((prev) => [newStudent, ...prev]);
+    if (editingStudentId) {
+      setStudentRows((prev) => prev.map((student) => student.id === editingStudentId ? { ...student, ...studentDetails } : student));
+      setEditingStudentId(null);
+    } else {
+      setStudentRows((prev) => [{ id: `S-${Date.now().toString().slice(-4)}`, ...studentDetails }, ...prev]);
+    }
     setForm({
       name: "",
       rollNo: "",
@@ -570,7 +732,7 @@ export function StudentsPage({ role }: { role: Role }) {
       />
       {!readOnly ? (
         <Panel className="mb-6">
-          <h2 className="mb-4 text-base font-semibold">Add student</h2>
+          <h2 className="mb-4 text-base font-semibold">{editingStudentId ? "Edit student" : "Add student"}</h2>
           <div className="grid gap-4 md:grid-cols-3">
             <label className="text-sm">
               <span className="mb-1.5 block text-muted-foreground">Name</span>
@@ -634,7 +796,15 @@ export function StudentsPage({ role }: { role: Role }) {
               </select>
             </label>
           </div>
-          <button type="button" className={btnRole + " mt-4"} onClick={handleAddStudent}>Add student</button>
+          <div className="mt-4 flex gap-2">
+            <button type="button" className={btnRole} onClick={handleAddStudent}>{editingStudentId ? "Save changes" : "Add student"}</button>
+            {editingStudentId ? (
+              <button type="button" className={btn} onClick={() => {
+                setEditingStudentId(null);
+                setForm({ name: "", rollNo: "", course: "", year: "Year 1", roomNo: "", phone: "", status: "Active" });
+              }}>Cancel</button>
+            ) : null}
+          </div>
         </Panel>
       ) : null}
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
@@ -650,7 +820,7 @@ export function StudentsPage({ role }: { role: Role }) {
 /* ---------------- Rooms ---------------- */
 export function RoomsPage({ role }: { role: Role }) {
   const readOnly = role === "warden";
-  const [roomRows, setRoomRows] = useState(rooms);
+  const [roomRows, setRoomRows] = usePersistentState("hotelsync-rooms", rooms);
   const [form, setForm] = useState({
     roomNo: "",
     block: "A Block",

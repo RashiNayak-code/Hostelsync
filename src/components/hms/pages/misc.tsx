@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import { PageHeader, Panel, StatCard, StatusBadge } from "@/components/hms/ui-kit";
 import { DonutProgress } from "@/components/hms/DonutProgress";
 import {
@@ -31,7 +33,7 @@ export function MessPage({ role }: { role: Role }) {
         ))}
       </div>
       <div className="panel overflow-x-auto">
-        <table className="w-full min-w-[760px] text-left text-sm">
+        <table className="w-full min-w-190 text-left text-sm">
           <thead>
             <tr className="border-b border-border text-xs tracking-wide text-muted-foreground uppercase">
               {["Day", "Breakfast", "Lunch", "Snacks", "Dinner", ...(editable ? [""] : [])].map((h) => (
@@ -60,15 +62,68 @@ export function MessPage({ role }: { role: Role }) {
 /* ---------------- Notices ---------------- */
 export function NoticesPage({ role }: { role: Role }) {
   const canPost = role === "admin";
+  const [noticeRows, setNoticeRows] = usePersistentState("hotelsync-notices", notices);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [form, setForm] = useState({ title: "", body: "" });
+
+  const handlePostNotice = () => {
+    const title = form.title.trim();
+    const body = form.body.trim();
+
+    if (!title || !body) {
+      return;
+    }
+
+    setNoticeRows((prev) => [{
+      id: `N-${Date.now().toString().slice(-6)}`,
+      title,
+      body,
+      audience: "All residents",
+      postedAt: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+    }, ...prev]);
+    setForm({ title: "", body: "" });
+    setIsFormOpen(false);
+  };
+
   return (
     <>
       <PageHeader
         title="Notices"
         description={canPost ? "Publish announcements to students and wardens." : "Announcements from the hostel office."}
-        action={canPost ? <button className={btnRole}><Megaphone className="size-4" />Post notice</button> : undefined}
+        action={canPost ? <button type="button" className={btnRole} onClick={() => setIsFormOpen((prev) => !prev)}><Megaphone className="size-4" />Post notice</button> : undefined}
       />
+      {canPost && isFormOpen ? (
+        <Panel className="mb-6">
+          <h2 className="mb-4 text-base font-semibold">Post a notice</h2>
+          <div className="space-y-4">
+            <label className="block text-sm">
+              <span className="mb-1.5 block text-muted-foreground">Heading</span>
+              <input
+                value={form.title}
+                onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
+                placeholder="Notice heading"
+                className="h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1.5 block text-muted-foreground">Description</span>
+              <textarea
+                rows={4}
+                value={form.body}
+                onChange={(event) => setForm((prev) => ({ ...prev, body: event.target.value }))}
+                placeholder="Write the notice description"
+                className="w-full rounded-lg border border-input bg-background/60 p-3 text-sm outline-none focus:border-role"
+              />
+            </label>
+          </div>
+          <div className="mt-4 flex gap-2">
+            <button type="button" className={btnRole} onClick={handlePostNotice}>Publish notice</button>
+            <button type="button" className={btnGhost} onClick={() => setIsFormOpen(false)}>Cancel</button>
+          </div>
+        </Panel>
+      ) : null}
       <div className="grid gap-4 md:grid-cols-2">
-        {notices.map((n) => (
+        {noticeRows.map((n) => (
           <Panel key={n.id}>
             <div className="flex items-start justify-between gap-3">
               <h3 className="font-semibold">{n.title}</h3>
@@ -80,7 +135,7 @@ export function NoticesPage({ role }: { role: Role }) {
               <span>{n.postedAt}</span>
             </div>
             {canPost ? (
-              <button className="mt-3 rounded-lg border border-border px-2.5 py-1 text-xs hover:bg-destructive/15 hover:text-destructive">Remove</button>
+              <button type="button" className="mt-3 rounded-lg border border-border px-2.5 py-1 text-xs hover:bg-destructive/15 hover:text-destructive" onClick={() => setNoticeRows((prev) => prev.filter((notice) => notice.id !== n.id))}>Remove</button>
             ) : null}
           </Panel>
         ))}
@@ -181,40 +236,84 @@ export function ReportsPage({ role }: { role: Role }) {
 
 /* ---------------- Profile ---------------- */
 export function ProfilePage() {
-  const fields: [string, string][] = [
-    ["Full name", currentStudent.name],
-    ["Roll number", currentStudent.rollNo],
-    ["Course", currentStudent.course],
-    ["Email", currentStudent.email],
-    ["Phone", currentStudent.phone],
-    ["Room", currentStudent.roomNo],
-    ["Guardian", currentStudent.guardianName],
-    ["Guardian phone", currentStudent.guardianPhone],
-    ["Joined on", currentStudent.dateOfJoining],
+  const defaultProfile = {
+    name: currentStudent.name,
+    rollNo: currentStudent.rollNo,
+    course: currentStudent.course,
+    email: currentStudent.email,
+    phone: currentStudent.phone,
+    roomNo: currentStudent.roomNo,
+    guardianName: currentStudent.guardianName,
+    guardianPhone: currentStudent.guardianPhone,
+    dateOfJoining: currentStudent.dateOfJoining,
+  };
+  const [profile, setProfile] = usePersistentState("hotelsync-profile", defaultProfile);
+  const [photo, setPhoto] = usePersistentState<string | null>("hotelsync-profile-photo", null);
+  const [saveMessage, setSaveMessage] = useState("");
+
+  const fields: [keyof typeof profile, string][] = [
+    ["name", "Full name"],
+    ["rollNo", "Roll number"],
+    ["course", "Course"],
+    ["email", "Email"],
+    ["phone", "Phone"],
+    ["roomNo", "Room"],
+    ["guardianName", "Guardian"],
+    ["guardianPhone", "Guardian phone"],
+    ["dateOfJoining", "Joined on"],
   ];
+
+  const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => setPhoto(typeof reader.result === "string" ? reader.result : null);
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveProfile = () => {
+    setSaveMessage("Profile changes saved");
+    window.setTimeout(() => setSaveMessage(""), 2500);
+  };
+
   return (
     <>
-      <PageHeader title="Profile" description="Your hostel record and contact details." action={<button className={btnRole}>Save changes</button>} />
+      <PageHeader title="Profile" description="Your hostel record and contact details." action={<button type="button" className={btnRole} onClick={handleSaveProfile}>Save changes</button>} />
       <div className="grid gap-6 lg:grid-cols-3">
         <Panel className="flex flex-col items-center text-center">
-          <span className="flex size-24 items-center justify-center rounded-full bg-role text-3xl font-bold text-role-foreground">
-            {currentStudent.name.charAt(0)}
-          </span>
-          <p className="mt-4 text-lg font-semibold">{currentStudent.name}</p>
-          <p className="text-sm text-muted-foreground">{currentStudent.rollNo}</p>
+          {photo ? (
+            <img src={photo} alt={`${profile.name} profile`} className="size-24 rounded-full object-cover" />
+          ) : (
+            <span className="flex size-24 items-center justify-center rounded-full bg-role text-3xl font-bold text-role-foreground">
+              {profile.name.charAt(0)}
+            </span>
+          )}
+          <p className="mt-4 text-lg font-semibold">{profile.name}</p>
+          <p className="text-sm text-muted-foreground">{profile.rollNo}</p>
           <div className="mt-3"><StatusBadge status={currentStudent.status} /></div>
-          <button className={btnGhost + " mt-5"}>Upload photo</button>
+          <label className={btnGhost + " mt-5 cursor-pointer"}>
+            Upload photo
+            <input type="file" accept="image/*" className="sr-only" onChange={handlePhotoChange} />
+          </label>
         </Panel>
         <Panel className="lg:col-span-2">
           <h2 className="mb-4 text-base font-semibold">Personal details</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            {fields.map(([label, value]) => (
+            {fields.map(([key, label]) => (
               <label key={label} className="text-sm">
                 <span className="mb-1.5 block text-muted-foreground">{label}</span>
-                <input defaultValue={value} className="h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role" />
+                <input
+                  value={profile[key]}
+                  onChange={(event) => setProfile((prev) => ({ ...prev, [key]: event.target.value }))}
+                  className="h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
+                />
               </label>
             ))}
           </div>
+          {saveMessage ? <p className="mt-4 text-sm text-success">{saveMessage}</p> : null}
         </Panel>
       </div>
     </>
@@ -244,7 +343,7 @@ export function SettingsPage({ role }: { role: Role }) {
                   <span className="block text-sm font-medium">{title}</span>
                   <span className="block text-xs text-muted-foreground">{sub}</span>
                 </span>
-                <input type="checkbox" defaultChecked={i < 2} className="mt-1 size-4 accent-[var(--role)]" />
+                <input type="checkbox" defaultChecked={i < 2} className="mt-1 size-4 accent-role" />
               </label>
             ))}
           </div>

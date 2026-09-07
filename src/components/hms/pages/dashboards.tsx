@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { DonutProgress } from "@/components/hms/DonutProgress";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import { FeatureCard, PageHeader, Panel, StatCard, StatusBadge } from "@/components/hms/ui-kit";
 import {
   attendanceTrend, complaints, currentStudent, feeCollection, fees, inr, leaves, notices,
@@ -60,6 +61,7 @@ function AttendanceChart() {
 }
 
 export function StudentDashboard() {
+  const [noticeRows] = usePersistentState("hotelsync-notices", notices);
   const myFees = fees.filter((f) => f.student === currentStudent.name);
   const pending = myFees.reduce((a, f) => a + (f.amount - f.paid), 0);
   const myComplaints = complaints.filter((c) => c.student === currentStudent.name);
@@ -103,7 +105,7 @@ export function StudentDashboard() {
         <Panel className="lg:col-span-3">
           <h2 className="mb-4 text-base font-semibold">Notices for you</h2>
           <div className="grid gap-3 md:grid-cols-2">
-            {notices.slice(0, 4).map((n) => (
+            {noticeRows.slice(0, 4).map((n) => (
               <div key={n.id} className="rounded-xl border border-border p-3">
                 <p className="text-sm font-medium">{n.title}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{n.body}</p>

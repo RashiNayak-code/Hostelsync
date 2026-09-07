@@ -110,6 +110,11 @@
   }
 }
 
+.outpass-date-input::-webkit-calendar-picker-indicator {
+  filter: invert(46%) sepia(93%) saturate(1814%) hue-rotate(201deg) brightness(96%) contrast(97%);
+  cursor: pointer;
+}
+
 @utility panel {
   background: linear-gradient(160deg, color-mix(in oklab, var(--surface) 92%, transparent), color-mix(in oklab, var(--background) 80%, transparent));
   border: 1px solid var(--border);
