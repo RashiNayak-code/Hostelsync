@@ -3,16 +3,34 @@ import { usePersistentState } from "@/hooks/use-persistent-state";
 import { PageHeader, Panel, StatCard, StatusBadge } from "@/components/hms/ui-kit";
 import { DonutProgress } from "@/components/hms/DonutProgress";
 import {
-  BarChart, Bar, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  BarChart,
+  Bar,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
 } from "recharts";
 import {
-  attendanceTrend, complaintsByCategory, currentStudent, feeCollection, inr, mealTimings,
-  messTimetable, monthlyCollection, notices, type Role,
+  attendanceTrend,
+  complaintsByCategory,
+  currentStudent,
+  feeCollection,
+  inr,
+  mealTimings,
+  messTimetable,
+  monthlyCollection,
+  notices,
+  students,
+  type Role,
 } from "@/data/hms";
 import { Download, FileBarChart2, Megaphone, UtensilsCrossed, Wallet } from "lucide-react";
 
-const btnRole = "inline-flex items-center gap-2 rounded-lg bg-role px-3 py-2 text-sm font-medium text-role-foreground hover:opacity-90";
-const btnGhost = "inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent";
+const btnRole =
+  "inline-flex items-center gap-2 rounded-lg bg-role px-3 py-2 text-sm font-medium text-role-foreground hover:opacity-90";
+const btnGhost =
+  "inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent";
 
 /* ---------------- Mess ---------------- */
 export function MessPage({ role }: { role: Role }) {
@@ -22,7 +40,14 @@ export function MessPage({ role }: { role: Role }) {
       <PageHeader
         title="Mess Timetable"
         description="Weekly menu and meal timings for the hostel mess."
-        action={editable ? <button className={btnRole}><UtensilsCrossed className="size-4" />Edit menu</button> : undefined}
+        action={
+          editable ? (
+            <button className={btnRole}>
+              <UtensilsCrossed className="size-4" />
+              Edit menu
+            </button>
+          ) : undefined
+        }
       />
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {mealTimings.map((m) => (
@@ -36,20 +61,33 @@ export function MessPage({ role }: { role: Role }) {
         <table className="w-full min-w-190 text-left text-sm">
           <thead>
             <tr className="border-b border-border text-xs tracking-wide text-muted-foreground uppercase">
-              {["Day", "Breakfast", "Lunch", "Snacks", "Dinner", ...(editable ? [""] : [])].map((h) => (
-                <th key={h} className="px-4 py-3 font-medium">{h}</th>
-              ))}
+              {["Day", "Breakfast", "Lunch", "Snacks", "Dinner", ...(editable ? [""] : [])].map(
+                (h) => (
+                  <th key={h} className="px-4 py-3 font-medium">
+                    {h}
+                  </th>
+                ),
+              )}
             </tr>
           </thead>
           <tbody>
             {messTimetable.map((d) => (
-              <tr key={d.day} className="border-b border-border/60 last:border-0 hover:bg-accent/40">
+              <tr
+                key={d.day}
+                className="border-b border-border/60 last:border-0 hover:bg-accent/40"
+              >
                 <td className="px-4 py-3 font-medium">{d.day}</td>
                 <td className="px-4 py-3 text-muted-foreground">{d.breakfast}</td>
                 <td className="px-4 py-3 text-muted-foreground">{d.lunch}</td>
                 <td className="px-4 py-3 text-muted-foreground">{d.snacks}</td>
                 <td className="px-4 py-3 text-muted-foreground">{d.dinner}</td>
-                {editable ? <td className="px-4 py-3"><button className="rounded-lg border border-border px-2.5 py-1 text-xs hover:bg-accent">Edit</button></td> : null}
+                {editable ? (
+                  <td className="px-4 py-3">
+                    <button className="rounded-lg border border-border px-2.5 py-1 text-xs hover:bg-accent">
+                      Edit
+                    </button>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
@@ -74,13 +112,20 @@ export function NoticesPage({ role }: { role: Role }) {
       return;
     }
 
-    setNoticeRows((prev) => [{
-      id: `N-${Date.now().toString().slice(-6)}`,
-      title,
-      body,
-      audience: "All residents",
-      postedAt: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
-    }, ...prev]);
+    setNoticeRows((prev) => [
+      {
+        id: `N-${Date.now().toString().slice(-6)}`,
+        title,
+        body,
+        audience: "All residents",
+        postedAt: new Date().toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }),
+      },
+      ...prev,
+    ]);
     setForm({ title: "", body: "" });
     setIsFormOpen(false);
   };
@@ -89,8 +134,23 @@ export function NoticesPage({ role }: { role: Role }) {
     <>
       <PageHeader
         title="Notices"
-        description={canPost ? "Publish announcements to students and wardens." : "Announcements from the hostel office."}
-        action={canPost ? <button type="button" className={btnRole} onClick={() => setIsFormOpen((prev) => !prev)}><Megaphone className="size-4" />Post notice</button> : undefined}
+        description={
+          canPost
+            ? "Publish announcements to students and wardens."
+            : "Announcements from the hostel office."
+        }
+        action={
+          canPost ? (
+            <button
+              type="button"
+              className={btnRole}
+              onClick={() => setIsFormOpen((prev) => !prev)}
+            >
+              <Megaphone className="size-4" />
+              Post notice
+            </button>
+          ) : undefined
+        }
       />
       {canPost && isFormOpen ? (
         <Panel className="mb-6">
@@ -117,8 +177,12 @@ export function NoticesPage({ role }: { role: Role }) {
             </label>
           </div>
           <div className="mt-4 flex gap-2">
-            <button type="button" className={btnRole} onClick={handlePostNotice}>Publish notice</button>
-            <button type="button" className={btnGhost} onClick={() => setIsFormOpen(false)}>Cancel</button>
+            <button type="button" className={btnRole} onClick={handlePostNotice}>
+              Publish notice
+            </button>
+            <button type="button" className={btnGhost} onClick={() => setIsFormOpen(false)}>
+              Cancel
+            </button>
           </div>
         </Panel>
       ) : null}
@@ -135,7 +199,13 @@ export function NoticesPage({ role }: { role: Role }) {
               <span>{n.postedAt}</span>
             </div>
             {canPost ? (
-              <button type="button" className="mt-3 rounded-lg border border-border px-2.5 py-1 text-xs hover:bg-destructive/15 hover:text-destructive" onClick={() => setNoticeRows((prev) => prev.filter((notice) => notice.id !== n.id))}>Remove</button>
+              <button
+                type="button"
+                className="mt-3 rounded-lg border border-border px-2.5 py-1 text-xs hover:bg-destructive/15 hover:text-destructive"
+                onClick={() => setNoticeRows((prev) => prev.filter((notice) => notice.id !== n.id))}
+              >
+                Remove
+              </button>
             ) : null}
           </Panel>
         ))}
@@ -153,8 +223,18 @@ export function ReportsPage({ role }: { role: Role }) {
       ["Report", "Metric", "Value", "Details"],
       ["Fee collection", "Collected", feeCollection.collected, `Target: ${feeCollection.target}`],
       ["Fee collection", "Collected percentage", `${feeCollection.collectedPct}%`, ""],
-      ...attendanceTrend.map((item) => ["Weekly attendance", item.day, item.present, `Absent: ${item.absent}`]),
-      ...monthlyCollection.map((item) => ["Monthly collection", item.month, item.amount, "Amount in thousands" ]),
+      ...attendanceTrend.map((item) => [
+        "Weekly attendance",
+        item.day,
+        item.present,
+        `Absent: ${item.absent}`,
+      ]),
+      ...monthlyCollection.map((item) => [
+        "Monthly collection",
+        item.month,
+        item.amount,
+        "Amount in thousands",
+      ]),
       ...complaintsByCategory.map((item) => ["Complaints by category", item.name, item.value, ""]),
     ];
 
@@ -175,12 +255,33 @@ export function ReportsPage({ role }: { role: Role }) {
     <>
       <PageHeader
         title="Reports"
-        description={canExport ? "Generate and export operational reports." : "Read-only analytics for your blocks."}
-        action={canExport ? <button type="button" className={btnRole} onClick={handleExportReports}><Download className="size-4" />Export CSV</button> : undefined}
+        description={
+          canExport
+            ? "Generate and export operational reports."
+            : "Read-only analytics for your blocks."
+        }
+        action={
+          canExport ? (
+            <button type="button" className={btnRole} onClick={handleExportReports}>
+              <Download className="size-4" />
+              Export CSV
+            </button>
+          ) : undefined
+        }
       />
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
-        <StatCard icon={Wallet} label="Fees collected" value={inr(feeCollection.collected)} hint={`of ${inr(feeCollection.target)} target`} />
-        <StatCard icon={FileBarChart2} label="Reports generated" value="38" hint="This academic year" />
+        <StatCard
+          icon={Wallet}
+          label="Fees collected"
+          value={inr(feeCollection.collected)}
+          hint={`of ${inr(feeCollection.target)} target`}
+        />
+        <StatCard
+          icon={FileBarChart2}
+          label="Reports generated"
+          value="38"
+          hint="This academic year"
+        />
         <StatCard icon={Megaphone} label="Open complaints" value="21" />
       </div>
       <div className="grid gap-6 lg:grid-cols-3">
@@ -190,9 +291,27 @@ export function ReportsPage({ role }: { role: Role }) {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={attendanceTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="day" stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 12, color: "var(--popover-foreground)" }} />
+                <XAxis
+                  dataKey="day"
+                  stroke="var(--muted-foreground)"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  stroke="var(--muted-foreground)"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--popover)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 12,
+                    color: "var(--popover-foreground)",
+                  }}
+                />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="present" fill="var(--role)" radius={[6, 6, 0, 0]} />
                 <Bar dataKey="absent" fill="var(--muted)" radius={[6, 6, 0, 0]} />
@@ -210,9 +329,27 @@ export function ReportsPage({ role }: { role: Role }) {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyCollection}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="month" stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 12, color: "var(--popover-foreground)" }} />
+                <XAxis
+                  dataKey="month"
+                  stroke="var(--muted-foreground)"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  stroke="var(--muted-foreground)"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--popover)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 12,
+                    color: "var(--popover-foreground)",
+                  }}
+                />
                 <Bar dataKey="amount" fill="var(--role)" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -236,21 +373,9 @@ export function ReportsPage({ role }: { role: Role }) {
 
 /* ---------------- Profile ---------------- */
 export function ProfilePage() {
-  const defaultProfile = {
-    name: currentStudent.name,
-    rollNo: currentStudent.rollNo,
-    course: currentStudent.course,
-    email: currentStudent.email,
-    phone: currentStudent.phone,
-    roomNo: currentStudent.roomNo,
-    guardianName: currentStudent.guardianName,
-    guardianPhone: currentStudent.guardianPhone,
-    dateOfJoining: currentStudent.dateOfJoining,
-  };
-  const [profile, setProfile] = usePersistentState("hotelsync-profile", defaultProfile);
-  const [photo, setPhoto] = usePersistentState<string | null>("hotelsync-profile-photo", null);
-  const [saveMessage, setSaveMessage] = useState("");
-
+  const [studentRows] = usePersistentState("hotelsync-students", students);
+  const profile =
+    studentRows.find((student) => student.rollNo === currentStudent.rollNo) ?? currentStudent;
   const fields: [keyof typeof profile, string][] = [
     ["name", "Full name"],
     ["rollNo", "Roll number"],
@@ -258,62 +383,47 @@ export function ProfilePage() {
     ["email", "Email"],
     ["phone", "Phone"],
     ["roomNo", "Room"],
-    ["guardianName", "Guardian"],
-    ["guardianPhone", "Guardian phone"],
     ["dateOfJoining", "Joined on"],
+    ["parentRelation", "Parent relation"],
+    ["parentName", "Parent name"],
+    ["parentPhone", "Parent contact"],
+    ["parentEmail", "Parent email"],
+    ["homeAddress", "Home address"],
+    ["bloodGroup", "Blood group"],
   ];
-
-  const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => setPhoto(typeof reader.result === "string" ? reader.result : null);
-    reader.readAsDataURL(file);
-  };
-
-  const handleSaveProfile = () => {
-    setSaveMessage("Profile changes saved");
-    window.setTimeout(() => setSaveMessage(""), 2500);
-  };
 
   return (
     <>
-      <PageHeader title="Profile" description="Your hostel record and contact details." action={<button type="button" className={btnRole} onClick={handleSaveProfile}>Save changes</button>} />
+      <PageHeader
+        title="Profile"
+        description="Your hostel record and contact details. Changes can be made by the admin or warden."
+      />
       <div className="grid gap-6 lg:grid-cols-3">
         <Panel className="flex flex-col items-center text-center">
-          {photo ? (
-            <img src={photo} alt={`${profile.name} profile`} className="size-24 rounded-full object-cover" />
-          ) : (
-            <span className="flex size-24 items-center justify-center rounded-full bg-role text-3xl font-bold text-role-foreground">
-              {profile.name.charAt(0)}
-            </span>
-          )}
+          <span className="flex size-24 items-center justify-center rounded-full bg-role text-3xl font-bold text-role-foreground">
+            {profile.name.charAt(0)}
+          </span>
           <p className="mt-4 text-lg font-semibold">{profile.name}</p>
           <p className="text-sm text-muted-foreground">{profile.rollNo}</p>
-          <div className="mt-3"><StatusBadge status={currentStudent.status} /></div>
-          <label className={btnGhost + " mt-5 cursor-pointer"}>
-            Upload photo
-            <input type="file" accept="image/*" className="sr-only" onChange={handlePhotoChange} />
-          </label>
+          <div className="mt-3">
+            <StatusBadge status={profile.status} />
+          </div>
+          <p className="mt-5 text-xs text-muted-foreground">
+            Profile updates are managed by hostel staff.
+          </p>
         </Panel>
         <Panel className="lg:col-span-2">
-          <h2 className="mb-4 text-base font-semibold">Personal details</h2>
+          <h2 className="mb-4 text-base font-semibold">Student details</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             {fields.map(([key, label]) => (
-              <label key={label} className="text-sm">
+              <div key={label} className="text-sm">
                 <span className="mb-1.5 block text-muted-foreground">{label}</span>
-                <input
-                  value={profile[key]}
-                  onChange={(event) => setProfile((prev) => ({ ...prev, [key]: event.target.value }))}
-                  className="h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
-                />
-              </label>
+                <p className="min-h-10 rounded-lg border border-border bg-muted/30 px-3 py-2">
+                  {profile[key] || "Not provided"}
+                </p>
+              </div>
             ))}
           </div>
-          {saveMessage ? <p className="mt-4 text-sm text-success">{saveMessage}</p> : null}
         </Panel>
       </div>
     </>
@@ -332,7 +442,11 @@ export function SettingsPage({ role }: { role: Role }) {
   ];
   return (
     <>
-      <PageHeader title="Settings" description="Preferences for this panel." action={<button className={btnRole}>Save preferences</button>} />
+      <PageHeader
+        title="Settings"
+        description="Preferences for this panel."
+        action={<button className={btnRole}>Save preferences</button>}
+      />
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel>
           <h2 className="mb-4 text-base font-semibold">Notifications</h2>
@@ -351,10 +465,21 @@ export function SettingsPage({ role }: { role: Role }) {
         <Panel>
           <h2 className="mb-4 text-base font-semibold">Security</h2>
           <div className="space-y-4">
-            <label className="block text-sm"><span className="mb-1.5 block text-muted-foreground">Current password</span>
-              <input type="password" defaultValue="demo1234" className="h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role" /></label>
-            <label className="block text-sm"><span className="mb-1.5 block text-muted-foreground">New password</span>
-              <input type="password" className="h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role" /></label>
+            <label className="block text-sm">
+              <span className="mb-1.5 block text-muted-foreground">Current password</span>
+              <input
+                type="password"
+                defaultValue="demo1234"
+                className="h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1.5 block text-muted-foreground">New password</span>
+              <input
+                type="password"
+                className="h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
+              />
+            </label>
             <button className={btnGhost}>Update password</button>
           </div>
         </Panel>
