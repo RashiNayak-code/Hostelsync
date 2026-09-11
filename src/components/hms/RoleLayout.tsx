@@ -29,6 +29,17 @@ import { getSupabaseClient } from "@/lib/supabase";
 
 type NavItem = { label: string; to: string; icon: LucideIcon };
 type AnyTo = "/";
+type HmsUserMetadata = Record<string, unknown> & {
+  full_name?: unknown;
+  roll_no?: unknown;
+  student_id?: unknown;
+  course?: unknown;
+  room_no?: unknown;
+  block?: unknown;
+  floor?: unknown;
+  phone?: unknown;
+  year?: unknown;
+};
 
 const nav: Record<Role, NavItem[]> = {
   student: [
@@ -107,7 +118,7 @@ export function RoleLayout({ role }: { role: Role }) {
       email?: string;
       user_metadata?: Record<string, unknown>;
     }) => {
-      const userMeta = sessionUser.user_metadata ?? {};
+      const userMeta = (sessionUser.user_metadata ?? {}) as HmsUserMetadata;
       const fullName =
         (typeof userMeta.full_name === "string" && userMeta.full_name.trim()) ||
         sessionUser.email?.split("@")[0] ||
@@ -168,22 +179,31 @@ export function RoleLayout({ role }: { role: Role }) {
         return;
       }
 
-      const userMeta = session.user.user_metadata ?? {};
+      const userMeta = session.user.user_metadata as HmsUserMetadata;
       void syncDatabaseProfile(session.user);
       const fullName =
         (typeof userMeta.full_name === "string" && userMeta.full_name.trim()) ||
         session.user.email?.split("@")[0] ||
         "User";
-      const roleFromMeta = userMeta.role as Role | undefined;
       const derivedSub =
         (typeof userMeta.roll_no === "string" && userMeta.roll_no.trim()) ||
         (typeof userMeta.student_id === "string" && userMeta.student_id.trim()) ||
         session.user.email ||
         "Hostel user";
 
-      if (roleFromMeta && roleFromMeta !== role && isMounted) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .maybeSingle();
+      const databaseRole =
+        profile?.role === "admin" || profile?.role === "warden" || profile?.role === "student"
+          ? profile.role
+          : "student";
+
+      if (databaseRole !== role && isMounted) {
         const target =
-          roleFromMeta === "student" ? "/student" : roleFromMeta === "admin" ? "/admin" : "/warden";
+          databaseRole === "student" ? "/student" : databaseRole === "admin" ? "/admin" : "/warden";
         void navigate({ to: target });
         return;
       }
@@ -203,7 +223,7 @@ export function RoleLayout({ role }: { role: Role }) {
         return;
       }
 
-      const userMeta = nextSession.user.user_metadata ?? {};
+      const userMeta = nextSession.user.user_metadata as HmsUserMetadata;
       void syncDatabaseProfile(nextSession.user);
       const fullName =
         (typeof userMeta.full_name === "string" && userMeta.full_name.trim()) ||

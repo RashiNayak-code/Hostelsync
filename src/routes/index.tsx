@@ -83,6 +83,22 @@ function Landing() {
     void navigate({ to: route });
   };
 
+  const getDatabaseRole = async (userId: string, fallbackRole: Role) => {
+    const { data: profile, error } = await getSupabaseClient()
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return profile?.role === "admin" || profile?.role === "warden" || profile?.role === "student"
+      ? profile.role
+      : fallbackRole;
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage(null);
@@ -115,7 +131,8 @@ function Landing() {
         }
 
         if (data.session) {
-          redirectToRolePanel(role);
+          const databaseRole = await getDatabaseRole(data.user.id, "student");
+          redirectToRolePanel(databaseRole);
           return;
         }
 
@@ -132,8 +149,12 @@ function Landing() {
         throw error;
       }
 
-      const signedInRole = (data.user?.user_metadata?.role as Role | undefined) ?? role;
-      redirectToRolePanel(signedInRole);
+      if (!data.user) {
+        throw new Error("Supabase did not return a user after login.");
+      }
+
+      const databaseRole = await getDatabaseRole(data.user.id, "student");
+      redirectToRolePanel(databaseRole);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Authentication failed. Please try again.",
