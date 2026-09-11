@@ -1,13 +1,31 @@
-import { useState } from "react";
-import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
-  Bell, Menu, X, LogOut, LayoutDashboard, Wallet, MessageSquareWarning, BedDouble,
-  DoorOpen, UtensilsCrossed, CalendarCheck, PlaneTakeoff, UserRound, Settings,
-  Users, Megaphone, FileBarChart2, ShieldCheck, GraduationCap, KeyRound,
+  Bell,
+  Menu,
+  X,
+  LogOut,
+  LayoutDashboard,
+  Wallet,
+  MessageSquareWarning,
+  BedDouble,
+  DoorOpen,
+  UtensilsCrossed,
+  CalendarCheck,
+  PlaneTakeoff,
+  UserRound,
+  Settings,
+  Users,
+  Megaphone,
+  FileBarChart2,
+  ShieldCheck,
+  GraduationCap,
+  KeyRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Role } from "@/data/hms";
 import { cn } from "@/lib/utils";
+import { getSupabaseClient } from "@/lib/supabase";
 
 type NavItem = { label: string; to: string; icon: LucideIcon };
 type AnyTo = "/";
@@ -54,22 +72,165 @@ const nav: Record<Role, NavItem[]> = {
   ],
 };
 
-const roleIcon: Record<Role, LucideIcon> = { student: GraduationCap, admin: ShieldCheck, warden: KeyRound };
-const roleTitle: Record<Role, string> = { student: "Student Panel", admin: "Admin Panel", warden: "Warden Panel" };
-const roleUser: Record<Role, { name: string; sub: string }> = {
-  student: { name: "Aarav Sharma", sub: "HMS2024/CS/118" },
-  admin: { name: "Priya Menon", sub: "Hostel Administrator" },
-  warden: { name: "Sanjay Desai", sub: "Chief Warden · Block B" },
+const roleIcon: Record<Role, LucideIcon> = {
+  student: GraduationCap,
+  admin: ShieldCheck,
+  warden: KeyRound,
+};
+const roleTitle: Record<Role, string> = {
+  student: "Student Panel",
+  admin: "Admin Panel",
+  warden: "Warden Panel",
+};
+const defaultRoleUser: Record<Role, { name: string; sub: string }> = {
+  student: { name: "Student", sub: "Pending profile" },
+  admin: { name: "Admin", sub: "Pending profile" },
+  warden: { name: "Warden", sub: "Pending profile" },
 };
 
 export function RoleLayout({ role }: { role: Role }) {
   const [open, setOpen] = useState(false);
+  const [user, setUser] = useState(defaultRoleUser[role]);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
   const items = nav[role];
   const RoleIcon = roleIcon[role];
-  const user = roleUser[role];
   const active = items.filter((i) => pathname === i.to || pathname.startsWith(i.to + "/"));
   const current = (active.length ? active[active.length - 1] : items[0])!;
+
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+    let isMounted = true;
+
+    const syncDatabaseProfile = async (sessionUser: {
+      id: string;
+      email?: string;
+      user_metadata?: Record<string, unknown>;
+    }) => {
+      const userMeta = sessionUser.user_metadata ?? {};
+      const fullName =
+        (typeof userMeta.full_name === "string" && userMeta.full_name.trim()) ||
+        sessionUser.email?.split("@")[0] ||
+        "User";
+      const profilePayload = {
+        id: sessionUser.id,
+        full_name: fullName,
+        roll_no: typeof userMeta.roll_no === "string" ? userMeta.roll_no : null,
+        course: typeof userMeta.course === "string" ? userMeta.course : null,
+        room_no: typeof userMeta.room_no === "string" ? userMeta.room_no : null,
+        block: typeof userMeta.block === "string" ? userMeta.block : null,
+        floor: typeof userMeta.floor === "string" ? userMeta.floor : null,
+        phone: typeof userMeta.phone === "string" ? userMeta.phone : null,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error: profileError } = await supabase.from("profiles").upsert(profilePayload);
+      if (profileError) {
+        console.error("Unable to sync HMS profile:", profileError.message);
+        return;
+      }
+
+      if (role === "student") {
+        const { error: studentError } = await supabase.from("students").upsert(
+          {
+            id: `AUTH-${sessionUser.id}`,
+            user_id: sessionUser.id,
+            name: fullName,
+            roll_no:
+              (typeof userMeta.roll_no === "string" && userMeta.roll_no.trim()) ||
+              `AUTH-${sessionUser.id.slice(0, 8)}`,
+            course:
+              (typeof userMeta.course === "string" && userMeta.course.trim()) || "Not specified",
+            room_no: typeof userMeta.room_no === "string" ? userMeta.room_no : null,
+            year: typeof userMeta.year === "string" ? userMeta.year : null,
+            status: "Active",
+            phone: typeof userMeta.phone === "string" ? userMeta.phone : null,
+            email: sessionUser.email ?? null,
+          },
+          { onConflict: "user_id" },
+        );
+
+        if (studentError) {
+          console.error("Unable to sync HMS student:", studentError.message);
+        }
+      }
+    };
+
+    const syncProfile = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        if (isMounted) {
+          void navigate({ to: "/" });
+        }
+        return;
+      }
+
+      const userMeta = session.user.user_metadata ?? {};
+      void syncDatabaseProfile(session.user);
+      const fullName =
+        (typeof userMeta.full_name === "string" && userMeta.full_name.trim()) ||
+        session.user.email?.split("@")[0] ||
+        "User";
+      const roleFromMeta = userMeta.role as Role | undefined;
+      const derivedSub =
+        (typeof userMeta.roll_no === "string" && userMeta.roll_no.trim()) ||
+        (typeof userMeta.student_id === "string" && userMeta.student_id.trim()) ||
+        session.user.email ||
+        "Hostel user";
+
+      if (roleFromMeta && roleFromMeta !== role && isMounted) {
+        const target =
+          roleFromMeta === "student" ? "/student" : roleFromMeta === "admin" ? "/admin" : "/warden";
+        void navigate({ to: target });
+        return;
+      }
+
+      if (isMounted) {
+        setUser({ name: fullName, sub: derivedSub });
+      }
+    };
+
+    void syncProfile();
+
+    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!nextSession?.user) {
+        if (isMounted) {
+          void navigate({ to: "/" });
+        }
+        return;
+      }
+
+      const userMeta = nextSession.user.user_metadata ?? {};
+      void syncDatabaseProfile(nextSession.user);
+      const fullName =
+        (typeof userMeta.full_name === "string" && userMeta.full_name.trim()) ||
+        nextSession.user.email?.split("@")[0] ||
+        "User";
+      const derivedSub =
+        (typeof userMeta.roll_no === "string" && userMeta.roll_no.trim()) ||
+        (typeof userMeta.student_id === "string" && userMeta.student_id.trim()) ||
+        nextSession.user.email ||
+        "Hostel user";
+
+      if (isMounted) {
+        setUser({ name: fullName, sub: derivedSub });
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      data.subscription.unsubscribe();
+    };
+  }, [navigate, role]);
+
+  const handleLogout = async () => {
+    const supabase = getSupabaseClient();
+    await supabase.auth.signOut();
+    void navigate({ to: "/" });
+  };
 
   return (
     <div data-role={role} className="min-h-screen bg-background text-foreground">
@@ -88,7 +249,11 @@ export function RoleLayout({ role }: { role: Role }) {
               <p className="text-sm font-semibold">HMS</p>
               <p className="text-xs text-role">{roleTitle[role]}</p>
             </div>
-            <button className="ml-auto lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu">
+            <button
+              className="ml-auto lg:hidden"
+              onClick={() => setOpen(false)}
+              aria-label="Close menu"
+            >
               <X className="size-5" />
             </button>
           </div>
@@ -114,18 +279,23 @@ export function RoleLayout({ role }: { role: Role }) {
             })}
           </nav>
           <div className="border-t border-border p-3">
-            <Link
-              to="/"
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive"
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive"
             >
               <LogOut className="size-4" />
               Logout
-            </Link>
+            </button>
           </div>
         </aside>
 
         {open ? (
-          <div className="fixed inset-0 z-30 bg-black/60 lg:hidden" onClick={() => setOpen(false)} aria-hidden />
+          <div
+            className="fixed inset-0 z-30 bg-black/60 lg:hidden"
+            onClick={() => setOpen(false)}
+            aria-hidden
+          />
         ) : null}
 
         <div className="min-w-0 flex-1 lg:pl-64">
@@ -141,7 +311,10 @@ export function RoleLayout({ role }: { role: Role }) {
               <p className="truncate text-xs text-muted-foreground">{current.label}</p>
             </div>
             <div className="ml-auto flex items-center gap-3">
-              <button className="relative rounded-lg border border-border p-2 hover:bg-accent" aria-label="Notifications">
+              <button
+                className="relative rounded-lg border border-border p-2 hover:bg-accent"
+                aria-label="Notifications"
+              >
                 <Bell className="size-4" />
                 <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-role" />
               </button>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { PageHeader, Panel, StatCard, StatusBadge } from "@/components/hms/ui-kit";
 import { DonutProgress } from "@/components/hms/DonutProgress";
@@ -25,6 +25,7 @@ import {
   students,
   type Role,
 } from "@/data/hms";
+import { getSupabaseClient } from "@/lib/supabase";
 import { Download, FileBarChart2, Megaphone, UtensilsCrossed, Wallet } from "lucide-react";
 
 const btnRole =
@@ -374,8 +375,153 @@ export function ReportsPage({ role }: { role: Role }) {
 /* ---------------- Profile ---------------- */
 export function ProfilePage() {
   const [studentRows] = usePersistentState("hotelsync-students", students);
-  const profile =
-    studentRows.find((student) => student.rollNo === currentStudent.rollNo) ?? currentStudent;
+  const [liveProfile, setLiveProfile] = useState({
+    name: currentStudent.name,
+    rollNo: currentStudent.rollNo,
+    course: currentStudent.course,
+    email: currentStudent.email,
+    phone: currentStudent.phone,
+    roomNo: currentStudent.roomNo,
+    dateOfJoining: currentStudent.dateOfJoining,
+    parentRelation: currentStudent.parentRelation,
+    parentName: currentStudent.parentName,
+    parentPhone: currentStudent.parentPhone,
+    parentEmail: currentStudent.parentEmail,
+    homeAddress: currentStudent.homeAddress,
+    bloodGroup: currentStudent.bloodGroup,
+    status: currentStudent.status,
+  });
+
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+    let isMounted = true;
+
+    const syncProfile = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user || !isMounted) {
+        return;
+      }
+
+      const userMeta = session.user.user_metadata ?? {};
+      const derived = {
+        name:
+          (typeof userMeta.full_name === "string" && userMeta.full_name.trim()) ||
+          session.user.email?.split("@")[0] ||
+          currentStudent.name,
+        rollNo:
+          (typeof userMeta.roll_no === "string" && userMeta.roll_no.trim()) ||
+          (typeof userMeta.student_id === "string" && userMeta.student_id.trim()) ||
+          currentStudent.rollNo,
+        course:
+          (typeof userMeta.course === "string" && userMeta.course.trim()) || currentStudent.course,
+        email: session.user.email || currentStudent.email,
+        phone:
+          (typeof userMeta.phone === "string" && userMeta.phone.trim()) || currentStudent.phone,
+        roomNo:
+          (typeof userMeta.room_no === "string" && userMeta.room_no.trim()) ||
+          currentStudent.roomNo,
+        dateOfJoining:
+          (typeof userMeta.date_of_joining === "string" && userMeta.date_of_joining.trim()) ||
+          currentStudent.dateOfJoining,
+        parentRelation:
+          (typeof userMeta.parent_relation === "string" && userMeta.parent_relation.trim()) ||
+          currentStudent.parentRelation,
+        parentName:
+          (typeof userMeta.parent_name === "string" && userMeta.parent_name.trim()) ||
+          currentStudent.parentName,
+        parentPhone:
+          (typeof userMeta.parent_phone === "string" && userMeta.parent_phone.trim()) ||
+          currentStudent.parentPhone,
+        parentEmail:
+          (typeof userMeta.parent_email === "string" && userMeta.parent_email.trim()) ||
+          currentStudent.parentEmail,
+        homeAddress:
+          (typeof userMeta.home_address === "string" && userMeta.home_address.trim()) ||
+          currentStudent.homeAddress,
+        bloodGroup:
+          (typeof userMeta.blood_group === "string" && userMeta.blood_group.trim()) ||
+          currentStudent.bloodGroup,
+        status:
+          (typeof userMeta.status === "string" && userMeta.status.trim()) || currentStudent.status,
+      };
+
+      if (isMounted) {
+        setLiveProfile(derived);
+      }
+    };
+
+    void syncProfile();
+
+    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!nextSession?.user) {
+        return;
+      }
+
+      const userMeta = nextSession.user.user_metadata ?? {};
+      const derived = {
+        name:
+          (typeof userMeta.full_name === "string" && userMeta.full_name.trim()) ||
+          nextSession.user.email?.split("@")[0] ||
+          currentStudent.name,
+        rollNo:
+          (typeof userMeta.roll_no === "string" && userMeta.roll_no.trim()) ||
+          (typeof userMeta.student_id === "string" && userMeta.student_id.trim()) ||
+          currentStudent.rollNo,
+        course:
+          (typeof userMeta.course === "string" && userMeta.course.trim()) || currentStudent.course,
+        email: nextSession.user.email || currentStudent.email,
+        phone:
+          (typeof userMeta.phone === "string" && userMeta.phone.trim()) || currentStudent.phone,
+        roomNo:
+          (typeof userMeta.room_no === "string" && userMeta.room_no.trim()) ||
+          currentStudent.roomNo,
+        dateOfJoining:
+          (typeof userMeta.date_of_joining === "string" && userMeta.date_of_joining.trim()) ||
+          currentStudent.dateOfJoining,
+        parentRelation:
+          (typeof userMeta.parent_relation === "string" && userMeta.parent_relation.trim()) ||
+          currentStudent.parentRelation,
+        parentName:
+          (typeof userMeta.parent_name === "string" && userMeta.parent_name.trim()) ||
+          currentStudent.parentName,
+        parentPhone:
+          (typeof userMeta.parent_phone === "string" && userMeta.parent_phone.trim()) ||
+          currentStudent.parentPhone,
+        parentEmail:
+          (typeof userMeta.parent_email === "string" && userMeta.parent_email.trim()) ||
+          currentStudent.parentEmail,
+        homeAddress:
+          (typeof userMeta.home_address === "string" && userMeta.home_address.trim()) ||
+          currentStudent.homeAddress,
+        bloodGroup:
+          (typeof userMeta.blood_group === "string" && userMeta.blood_group.trim()) ||
+          currentStudent.bloodGroup,
+        status:
+          (typeof userMeta.status === "string" && userMeta.status.trim()) || currentStudent.status,
+      };
+
+      if (isMounted) {
+        setLiveProfile(derived);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
+  const profile = {
+    ...currentStudent,
+    ...studentRows.find(
+      (student) => student.email === liveProfile.email || student.rollNo === liveProfile.rollNo,
+    ),
+    ...liveProfile,
+  };
+
   const fields: [keyof typeof profile, string][] = [
     ["name", "Full name"],
     ["rollNo", "Roll number"],

@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { supabase } from "../lib/supabase";
 
 function NotFoundComponent() {
   return (
@@ -78,10 +79,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "HMS — Hostel Management System" },
-      { name: "description", content: "Role-based hostel management for students, admins and wardens." },
+      {
+        name: "description",
+        content: "Role-based hostel management for students, admins and wardens.",
+      },
       { name: "author", content: "HMS" },
       { property: "og:title", content: "HMS — Hostel Management System" },
-      { property: "og:description", content: "Role-based hostel management for students, admins and wardens." },
+      {
+        property: "og:description",
+        content: "Role-based hostel management for students, admins and wardens.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
@@ -122,6 +129,17 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    if (!supabase) {
+      console.warn("Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+      return;
+    }
+
+    supabase.auth.getSession().catch((error) => {
+      console.error("Supabase session check failed:", error);
+    });
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

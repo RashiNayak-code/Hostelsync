@@ -1,25 +1,58 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { GraduationCap, ShieldCheck, KeyRound, LockKeyhole, Layers, DatabaseZap, Sparkles, ArrowRight } from "lucide-react";
+import {
+  GraduationCap,
+  ShieldCheck,
+  KeyRound,
+  LockKeyhole,
+  Layers,
+  DatabaseZap,
+  Sparkles,
+  ArrowRight,
+} from "lucide-react";
 import type { Role } from "@/data/hms";
 import { cn } from "@/lib/utils";
+import { getSupabaseClient } from "@/lib/supabase";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "HMS — Hostel Management System | Smart, Secure, Simplified" },
-      { name: "description", content: "Role-based hostel management for students, admins and wardens: fees, complaints, rooms, outpass, attendance and mess — in one dashboard." },
+      {
+        name: "description",
+        content:
+          "Role-based hostel management for students, admins and wardens: fees, complaints, rooms, outpass, attendance and mess — in one dashboard.",
+      },
       { property: "og:title", content: "HMS — Hostel Management System" },
-      { property: "og:description", content: "Three role-based dashboards for students, admins and wardens. Fees, complaints, rooms, outpass, attendance and mess in one place." },
+      {
+        property: "og:description",
+        content:
+          "Three role-based dashboards for students, admins and wardens. Fees, complaints, rooms, outpass, attendance and mess in one place.",
+      },
     ],
   }),
   component: Landing,
 });
 
 const roles: { id: Role; label: string; blurb: string; icon: typeof GraduationCap }[] = [
-  { id: "student", label: "Student", blurb: "Fees, complaints, outpass, room, attendance & mess", icon: GraduationCap },
-  { id: "admin", label: "Admin", blurb: "Students, rooms, fees collection, notices & reports", icon: ShieldCheck },
-  { id: "warden", label: "Warden", blurb: "Approvals, attendance monitoring & student overview", icon: KeyRound },
+  {
+    id: "student",
+    label: "Student",
+    blurb: "Fees, complaints, outpass, room, attendance & mess",
+    icon: GraduationCap,
+  },
+  {
+    id: "admin",
+    label: "Admin",
+    blurb: "Students, rooms, fees collection, notices & reports",
+    icon: ShieldCheck,
+  },
+  {
+    id: "warden",
+    label: "Warden",
+    blurb: "Approvals, attendance monitoring & student overview",
+    icon: KeyRound,
+  },
 ];
 
 const trust = [
@@ -32,7 +65,83 @@ const trust = [
 function Landing() {
   const [role, setRole] = useState<Role>("student");
   const [mode, setMode] = useState<"login" | "register">("login");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("student@campus.edu");
+  const [password, setPassword] = useState("demo1234");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    setEmail(`${role}@campus.edu`);
+  }, [role]);
+
+  const redirectToRolePanel = (targetRole: Role) => {
+    const route =
+      targetRole === "student" ? "/student" : targetRole === "admin" ? "/admin" : "/warden";
+    void navigate({ to: route });
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    if (!email.trim() || !password.trim()) {
+      setErrorMessage("Email and password are required.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const supabase = getSupabaseClient();
+
+      if (mode === "register") {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              role,
+              full_name: fullName.trim() || email.split("@")[0],
+            },
+          },
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        if (data.session) {
+          redirectToRolePanel(role);
+          return;
+        }
+
+        setSuccessMessage("Account created. Check your email to confirm before signing in.");
+        return;
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      const signedInRole = (data.user?.user_metadata?.role as Role | undefined) ?? role;
+      redirectToRolePanel(signedInRole);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Authentication failed. Please try again.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div data-role={role} className="min-h-screen bg-background">
@@ -58,7 +167,9 @@ function Landing() {
                     onClick={() => setMode(m)}
                     className={cn(
                       "rounded-lg py-2 text-sm font-medium capitalize transition-colors",
-                      mode === m ? "bg-role text-role-foreground" : "text-muted-foreground hover:text-foreground",
+                      mode === m
+                        ? "bg-role text-role-foreground"
+                        : "text-muted-foreground hover:text-foreground",
                     )}
                   >
                     {m}
@@ -74,7 +185,9 @@ function Landing() {
                     onClick={() => setRole(r.id)}
                     className={cn(
                       "flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-xs font-medium transition-colors",
-                      role === r.id ? "border-role bg-role-soft text-role" : "border-border text-muted-foreground hover:bg-accent",
+                      role === r.id
+                        ? "border-role bg-role-soft text-role"
+                        : "border-border text-muted-foreground hover:bg-accent",
                     )}
                   >
                     <r.icon className="size-4" />
@@ -83,33 +196,63 @@ function Landing() {
                 ))}
               </div>
 
-              <form
-                className="space-y-4"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void navigate({ to: role === "student" ? "/student" : role === "admin" ? "/admin" : "/warden" });
-                }}
-              >
+              <form className="space-y-4" onSubmit={handleSubmit}>
                 {mode === "register" ? (
                   <label className="block text-sm">
                     <span className="mb-1.5 block text-muted-foreground">Full name</span>
-                    <input required placeholder="Your name" className="h-11 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role" />
+                    <input
+                      required
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Your name"
+                      className="h-11 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
+                    />
                   </label>
                 ) : null}
                 <label className="block text-sm">
                   <span className="mb-1.5 block text-muted-foreground">Email</span>
-                  <input type="email" defaultValue={`${role}@campus.edu`} className="h-11 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="h-11 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
+                  />
                 </label>
                 <label className="block text-sm">
                   <span className="mb-1.5 block text-muted-foreground">Password</span>
-                  <input type="password" defaultValue="demo1234" className="h-11 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="h-11 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
+                  />
                 </label>
-                <button className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-role text-sm font-semibold text-role-foreground transition-opacity hover:opacity-90">
-                  {mode === "login" ? "Login" : "Create account"} as {roles.find((r) => r.id === role)?.label}
+
+                {errorMessage ? (
+                  <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                    {errorMessage}
+                  </p>
+                ) : null}
+
+                {successMessage ? (
+                  <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                    {successMessage}
+                  </p>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-role text-sm font-semibold text-role-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isSubmitting ? "Please wait..." : mode === "login" ? "Login" : "Create account"}{" "}
+                  as {roles.find((r) => r.id === role)?.label}
                   <ArrowRight className="size-4" />
                 </button>
               </form>
-              <p className="mt-4 text-center text-xs text-muted-foreground">Demo mode — any credentials open the selected panel.</p>
+              <p className="mt-4 text-center text-xs text-muted-foreground">
+                Use your Supabase email/password to sign in or register.
+              </p>
             </div>
           </div>
         </div>
@@ -117,11 +260,13 @@ function Landing() {
         {/* Right: hero */}
         <div className="grid-glow relative flex flex-col justify-center border-t border-border bg-surface/40 px-6 py-14 sm:px-12 lg:border-t-0 lg:border-l">
           <h1 className="text-3xl leading-tight font-extrabold tracking-tight uppercase sm:text-4xl">
-            Hostel Management<br />System
+            Hostel Management
+            <br />
+            System
           </h1>
           <p className="mt-4 max-w-lg text-muted-foreground">
-            Students, rooms, fees, complaints, outpasses, attendance and mess — every part of hostel life
-            centralised into three role-based dashboards.
+            Students, rooms, fees, complaints, outpasses, attendance and mess — every part of hostel
+            life centralised into three role-based dashboards.
           </p>
 
           <div className="mt-8 grid gap-3">
