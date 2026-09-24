@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   GraduationCap,
@@ -73,10 +73,6 @@ function Landing() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    setEmail(`${role}@campus.edu`);
-  }, [role]);
-
   const redirectToRolePanel = (targetRole: Role) => {
     const route =
       targetRole === "student" ? "/student" : targetRole === "admin" ? "/admin" : "/warden";
@@ -91,7 +87,11 @@ function Landing() {
       .maybeSingle();
 
     if (error) {
-      throw error;
+      console.warn(
+        "Unable to load HMS profile; using the authenticated user's role:",
+        error.message,
+      );
+      return fallbackRole;
     }
 
     return profile?.role === "admin" || profile?.role === "warden" || profile?.role === "student"
@@ -131,7 +131,7 @@ function Landing() {
         }
 
         if (data.session) {
-          const databaseRole = await getDatabaseRole(data.user.id, "student");
+          const databaseRole = await getDatabaseRole(data.user.id, role);
           redirectToRolePanel(databaseRole);
           return;
         }
@@ -141,7 +141,7 @@ function Landing() {
       }
 
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password,
       });
 
@@ -153,11 +153,21 @@ function Landing() {
         throw new Error("Supabase did not return a user after login.");
       }
 
-      const databaseRole = await getDatabaseRole(data.user.id, "student");
+      const metadataRole = data.user.user_metadata?.role;
+      const fallbackRole =
+        metadataRole === "admin" || metadataRole === "warden" || metadataRole === "student"
+          ? metadataRole
+          : "student";
+      const databaseRole = await getDatabaseRole(data.user.id, fallbackRole);
       redirectToRolePanel(databaseRole);
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Authentication failed.";
       setErrorMessage(
-        error instanceof Error ? error.message : "Authentication failed. Please try again.",
+        message.toLowerCase().includes("email not confirmed")
+          ? "This email is registered but not confirmed. Check your inbox or disable email confirmation in Supabase for development."
+          : message.toLowerCase().includes("invalid login credentials")
+            ? "The email or password is incorrect. Use the password saved for this Supabase user."
+            : message,
       );
     } finally {
       setIsSubmitting(false);

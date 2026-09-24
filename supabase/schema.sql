@@ -256,6 +256,10 @@ as $$
 declare
   user_role text := 'student';
 begin
+  if new.raw_user_meta_data->>'role' in ('admin', 'warden', 'student') then
+    user_role := new.raw_user_meta_data->>'role';
+  end if;
+
   insert into public.profiles (id, full_name, role, roll_no, course, room_no, block, floor, phone)
   values (
     new.id,
@@ -287,3 +291,26 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_hms_user();
+
+-- Backfill profiles for users created before the trigger was installed.
+insert into public.profiles (id, full_name, role)
+select
+  u.id,
+  coalesce(nullif(u.raw_user_meta_data->>'full_name', ''), split_part(u.email, '@', 1)),
+  case
+    when u.raw_user_meta_data->>'role' in ('admin', 'warden', 'student')
+      then u.raw_user_meta_data->>'role'
+    else 'student'
+  end
+from auth.users u
+where not exists (
+  select 1 from public.profiles p where p.id = u.id
+);
+
+-- Repair profiles created with a valid role in their Auth metadata.
+update public.profiles p
+set role = u.raw_user_meta_data->>'role',
+    updated_at = now()
+from auth.users u
+where p.id = u.id
+  and u.raw_user_meta_data->>'role' in ('admin', 'warden', 'student');

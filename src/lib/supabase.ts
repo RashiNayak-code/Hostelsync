@@ -1,18 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl =
-  (import.meta.env.VITE_SUPABASE_URL as string | undefined) ??
-  (import.meta.env.SUPABASE_URL as string | undefined) ??
-  "";
+const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? "";
 
-const supabaseAnonKey =
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ??
-  (import.meta.env.SUPABASE_PUBLISHABLE_KEY as string | undefined) ??
-  "";
+const supabasePublishableKey =
+  (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined) ?? "";
 
 export const supabase =
-  supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey, {
+  supabaseUrl && supabasePublishableKey
+    ? createClient(supabaseUrl, supabasePublishableKey, {
         auth: {
           persistSession: true,
           autoRefreshToken: true,
@@ -24,7 +19,7 @@ export const supabase =
 export function getSupabaseClient() {
   if (!supabase) {
     throw new Error(
-      "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment.",
+      "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in your environment.",
     );
   }
 

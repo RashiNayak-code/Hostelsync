@@ -5,7 +5,7 @@
       "source": "supabase/server",
       "sourceType": "github",
       "skillPath": "skills/supabase-server/SKILL.md",
-      "computedHash": "139113c1e1838d156a0c9562e57abb85011c1eeb1cd7b449fd4e84a65c0020ab"
+      "computedHash": "e0724ea04077c2401ca90e2969318000bf8ad64e9ab816478efd60ae62a3376f"
     }
   }
 }

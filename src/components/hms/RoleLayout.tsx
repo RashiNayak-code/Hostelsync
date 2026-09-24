@@ -126,6 +126,10 @@ export function RoleLayout({ role }: { role: Role }) {
       const profilePayload = {
         id: sessionUser.id,
         full_name: fullName,
+        role:
+          userMeta.role === "admin" || userMeta.role === "warden" || userMeta.role === "student"
+            ? userMeta.role
+            : role,
         roll_no: typeof userMeta.roll_no === "string" ? userMeta.roll_no : null,
         course: typeof userMeta.course === "string" ? userMeta.course : null,
         room_no: typeof userMeta.room_no === "string" ? userMeta.room_no : null,

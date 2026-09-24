@@ -132,7 +132,9 @@ function RootComponent() {
 
   useEffect(() => {
     if (!supabase) {
-      console.warn("Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+      console.warn(
+        "Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.",
+      );
       return;
     }
 
