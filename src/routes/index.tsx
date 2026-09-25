@@ -115,12 +115,20 @@ function Landing() {
       const supabase = getSupabaseClient();
 
       if (mode === "register") {
+        if (role === "admin" || role === "warden") {
+          setErrorMessage(
+            "Admin and Warden accounts cannot be registered publicly. Please contact administration or register as a Student.",
+          );
+          setIsSubmitting(false);
+          return;
+        }
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
-              role,
+              role: "student",
               full_name: fullName.trim() || email.split("@")[0],
             },
           },
@@ -130,8 +138,8 @@ function Landing() {
           throw error;
         }
 
-        if (data.session) {
-          const databaseRole = await getDatabaseRole(data.user.id, role);
+        if (data.session && data.user) {
+          const databaseRole = await getDatabaseRole(data.user.id, "student");
           redirectToRolePanel(databaseRole);
           return;
         }

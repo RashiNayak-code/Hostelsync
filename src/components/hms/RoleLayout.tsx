@@ -102,6 +102,7 @@ const defaultRoleUser: Record<Role, { name: string; sub: string }> = {
 export function RoleLayout({ role }: { role: Role }) {
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState(defaultRoleUser[role]);
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const items = nav[role];
@@ -126,10 +127,6 @@ export function RoleLayout({ role }: { role: Role }) {
       const profilePayload = {
         id: sessionUser.id,
         full_name: fullName,
-        role:
-          userMeta.role === "admin" || userMeta.role === "warden" || userMeta.role === "student"
-            ? userMeta.role
-            : role,
         roll_no: typeof userMeta.roll_no === "string" ? userMeta.roll_no : null,
         course: typeof userMeta.course === "string" ? userMeta.course : null,
         room_no: typeof userMeta.room_no === "string" ? userMeta.room_no : null,
@@ -178,22 +175,11 @@ export function RoleLayout({ role }: { role: Role }) {
 
       if (!session?.user) {
         if (isMounted) {
+          setIsAuthorized(false);
           void navigate({ to: "/" });
         }
         return;
       }
-
-      const userMeta = session.user.user_metadata as HmsUserMetadata;
-      void syncDatabaseProfile(session.user);
-      const fullName =
-        (typeof userMeta.full_name === "string" && userMeta.full_name.trim()) ||
-        session.user.email?.split("@")[0] ||
-        "User";
-      const derivedSub =
-        (typeof userMeta.roll_no === "string" && userMeta.roll_no.trim()) ||
-        (typeof userMeta.student_id === "string" && userMeta.student_id.trim()) ||
-        session.user.email ||
-        "Hostel user";
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -205,15 +191,31 @@ export function RoleLayout({ role }: { role: Role }) {
           ? profile.role
           : "student";
 
-      if (databaseRole !== role && isMounted) {
-        const target =
-          databaseRole === "student" ? "/student" : databaseRole === "admin" ? "/admin" : "/warden";
-        void navigate({ to: target });
+      if (databaseRole !== role) {
+        if (isMounted) {
+          setIsAuthorized(false);
+          const target =
+            databaseRole === "student" ? "/student" : databaseRole === "admin" ? "/admin" : "/warden";
+          void navigate({ to: target });
+        }
         return;
       }
 
+      void syncDatabaseProfile(session.user);
+      const userMeta = session.user.user_metadata as HmsUserMetadata;
+      const fullName =
+        (typeof userMeta.full_name === "string" && userMeta.full_name.trim()) ||
+        session.user.email?.split("@")[0] ||
+        "User";
+      const derivedSub =
+        (typeof userMeta.roll_no === "string" && userMeta.roll_no.trim()) ||
+        (typeof userMeta.student_id === "string" && userMeta.student_id.trim()) ||
+        session.user.email ||
+        "Hostel user";
+
       if (isMounted) {
         setUser({ name: fullName, sub: derivedSub });
+        setIsAuthorized(true);
       }
     };
 
@@ -222,26 +224,13 @@ export function RoleLayout({ role }: { role: Role }) {
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!nextSession?.user) {
         if (isMounted) {
+          setIsAuthorized(false);
           void navigate({ to: "/" });
         }
         return;
       }
 
-      const userMeta = nextSession.user.user_metadata as HmsUserMetadata;
-      void syncDatabaseProfile(nextSession.user);
-      const fullName =
-        (typeof userMeta.full_name === "string" && userMeta.full_name.trim()) ||
-        nextSession.user.email?.split("@")[0] ||
-        "User";
-      const derivedSub =
-        (typeof userMeta.roll_no === "string" && userMeta.roll_no.trim()) ||
-        (typeof userMeta.student_id === "string" && userMeta.student_id.trim()) ||
-        nextSession.user.email ||
-        "Hostel user";
-
-      if (isMounted) {
-        setUser({ name: fullName, sub: derivedSub });
-      }
+      void syncProfile();
     });
 
     return () => {
@@ -354,7 +343,7 @@ export function RoleLayout({ role }: { role: Role }) {
             </div>
           </header>
           <main className="grid-glow min-h-[calc(100vh-61px)] p-4 sm:p-6">
-            <Outlet />
+            {isAuthorized ? <Outlet /> : null}
           </main>
         </div>
       </div>

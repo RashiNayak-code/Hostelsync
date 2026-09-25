@@ -193,9 +193,41 @@ drop policy if exists "users read settings" on public.settings;
 create policy "users read own profile" on public.profiles
   for select using (id = auth.uid() or public.is_hms_staff());
 create policy "users insert own profile" on public.profiles
-  for insert with check (id = auth.uid());
+  for insert with check (
+    id = auth.uid()
+    and (role = 'student' or public.is_hms_staff())
+  );
 create policy "users update own profile" on public.profiles
-  for update using (id = auth.uid()) with check (id = auth.uid());
+  for update using (id = auth.uid() or public.is_hms_staff())
+  with check (id = auth.uid() or public.is_hms_staff());
+
+create or replace function public.prevent_profile_role_escalation()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- If role is being changed to a privileged staff role ('admin' or 'warden')
+  if new.role is distinct from old.role and new.role in ('admin', 'warden') then
+    -- When called via client/REST API (auth.uid() is not null)
+    -- Allow change ONLY if the calling user is already an Admin in public.profiles
+    if auth.uid() is not null and not exists (
+      select 1 from public.profiles
+      where id = auth.uid() and role = 'admin'
+    ) then
+      raise exception 'Unauthorized: Only administrators can assign Admin or Warden roles.';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_prevent_role_escalation on public.profiles;
+create trigger trg_prevent_role_escalation
+  before update on public.profiles
+  for each row execute procedure public.prevent_profile_role_escalation();
 
 create policy "users read own student record" on public.students
   for select using (user_id = auth.uid());
@@ -254,10 +286,16 @@ security definer
 set search_path = public
 as $$
 declare
+  requested_role text;
   user_role text := 'student';
 begin
-  if new.raw_user_meta_data->>'role' in ('admin', 'warden', 'student') then
-    user_role := new.raw_user_meta_data->>'role';
+  requested_role := lower(coalesce(new.raw_user_meta_data->>'role', 'student'));
+
+  -- Public registration cannot self-assign admin or warden
+  if requested_role in ('admin', 'warden') then
+    user_role := 'student';
+  else
+    user_role := 'student';
   end if;
 
   insert into public.profiles (id, full_name, role, roll_no, course, room_no, block, floor, phone)
@@ -274,13 +312,17 @@ begin
   )
   on conflict (id) do update set
     full_name = excluded.full_name,
-    role = excluded.role,
-    roll_no = excluded.roll_no,
-    course = excluded.course,
-    room_no = excluded.room_no,
-    block = excluded.block,
-    floor = excluded.floor,
-    phone = excluded.phone,
+    -- Strictly preserve existing admin and warden accounts; never overwrite with student
+    role = case
+      when public.profiles.role in ('admin', 'warden') then public.profiles.role
+      else excluded.role
+    end,
+    roll_no = coalesce(excluded.roll_no, public.profiles.roll_no),
+    course = coalesce(excluded.course, public.profiles.course),
+    room_no = coalesce(excluded.room_no, public.profiles.room_no),
+    block = coalesce(excluded.block, public.profiles.block),
+    floor = coalesce(excluded.floor, public.profiles.floor),
+    phone = coalesce(excluded.phone, public.profiles.phone),
     updated_at = now();
 
   return new;
