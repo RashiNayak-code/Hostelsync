@@ -1427,19 +1427,112 @@ export function LeavePage({ role }: { role: Role }) {
 }
 
 /* ---------------- Attendance ---------------- */
+const formatAttendanceDate = (dateStr?: string | null) => {
+  if (!dateStr) return "—";
+  try {
+    const parts = dateStr.split("-");
+    if (parts.length === 3 && parts[0].length === 4) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const d = new Date(year, month, day);
+      return d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    }
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return dateStr;
+  }
+};
+
 export function AttendancePage({ role }: { role: Role }) {
   const [attendanceRows, setAttendanceRows] = usePersistentState(
     "hotelsync-attendance",
     attendance,
   );
+  const [studentAttendance, setStudentAttendance] = useState<(typeof attendance)[number][]>([]);
+  const [loading, setLoading] = useState(isStudent(role));
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchStudentAttendance = useCallback(async () => {
+    if (!isStudent(role)) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const supabase = getSupabaseClient();
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) throw sessionError;
+
+      const userId = session?.user?.id;
+      if (!userId) {
+        setStudentAttendance([]);
+        return;
+      }
+
+      const { data, error: fetchError } = await supabase
+        .from("attendance")
+        .select("*")
+        .eq("user_id", userId)
+        .order("date", { ascending: false });
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      const mapped: (typeof attendance)[number][] = (data || []).map((row) => ({
+        date: formatAttendanceDate(row.date),
+        student: row.student_name ?? "Student",
+        roomNo: row.room_no ?? "",
+        status: (row.status as (typeof attendance)[number]["status"]) || "Present",
+        markedBy: row.marked_by ?? "Warden",
+      }));
+
+      setStudentAttendance(mapped);
+    } catch (err: unknown) {
+      console.error("Error fetching student attendance:", err);
+      setError(err instanceof Error ? err.message : "Failed to load attendance records.");
+    } finally {
+      setLoading(false);
+    }
+  }, [role]);
+
+  useEffect(() => {
+    if (!isStudent(role)) return;
+
+    void fetchStudentAttendance();
+
+    const supabase = getSupabaseClient();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void fetchStudentAttendance();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchStudentAttendance, role]);
 
   const handleMarkTodayBulk = () => {
     setAttendanceRows((prev) => prev.map((row) => ({ ...row, status: "Present" })));
   };
 
-  const rows = isStudent(role)
-    ? attendanceRows.filter((a) => a.student === currentStudent.name)
-    : attendanceRows;
+  const rows = isStudent(role) ? studentAttendance : attendanceRows;
   const cols: Column<(typeof attendance)[number]>[] = [
     { key: "date", header: "Date", render: (r) => <span className="font-medium">{r.date}</span> },
     ...(isStudent(role)
@@ -1517,6 +1610,8 @@ export function AttendancePage({ role }: { role: Role }) {
       : []),
   ];
   const present = rows.filter((r) => r.status === "Present").length;
+  const absent = rows.filter((r) => r.status === "Absent").length;
+
   return (
     <>
       <PageHeader
@@ -1534,25 +1629,43 @@ export function AttendancePage({ role }: { role: Role }) {
           ) : undefined
         }
       />
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <StatCard icon={CheckCircle2} label="Present days" value={String(present)} />
-        <StatCard
-          icon={XCircle}
-          label="Absent days"
-          value={String(rows.filter((r) => r.status === "Absent").length)}
-        />
-        <StatCard
-          icon={Clock}
-          label="Attendance rate"
-          value={rows.length ? Math.round((present / rows.length) * 100) + "%" : "—"}
-        />
-      </div>
-      <DataTable
-        title="Attendance log"
-        rows={rows}
-        columns={cols}
-        searchKeys={["student", "date", "status"]}
-      />
+
+      {isStudent(role) && loading ? (
+        <div className="panel flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center">
+          <Loader2 className="size-8 animate-spin text-role" />
+          <p className="text-sm font-medium text-muted-foreground">
+            Loading your attendance records…
+          </p>
+        </div>
+      ) : isStudent(role) && error ? (
+        <div className="panel flex min-h-64 flex-col items-center justify-center gap-3 border-danger/30 bg-danger/5 p-8 text-center">
+          <AlertCircle className="size-8 text-danger" />
+          <p className="font-semibold text-danger">Unable to load attendance records</p>
+          <p className="max-w-md text-sm text-muted-foreground">{error}</p>
+          <button type="button" className={btnRole} onClick={() => void fetchStudentAttendance()}>
+            Retry
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="mb-6 grid gap-4 sm:grid-cols-3">
+            <StatCard icon={CheckCircle2} label="Present days" value={String(present)} />
+            <StatCard icon={XCircle} label="Absent days" value={String(absent)} />
+            <StatCard
+              icon={Clock}
+              label="Attendance rate"
+              value={rows.length ? Math.round((present / rows.length) * 100) + "%" : "—"}
+            />
+          </div>
+          <DataTable
+            title="Attendance log"
+            rows={rows}
+            columns={cols}
+            searchKeys={["student", "date", "status"]}
+            emptyText="No attendance records found"
+          />
+        </>
+      )}
     </>
   );
 }
