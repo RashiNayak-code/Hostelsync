@@ -1,8 +1,9 @@
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DataTable, type Column } from "@/components/hms/DataTable";
 import { DonutProgress } from "@/components/hms/DonutProgress";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { PageHeader, Panel, StatCard, StatusBadge, ProgressBar } from "@/components/hms/ui-kit";
+import { getSupabaseClient } from "@/lib/supabase";
 import {
   attendance,
   complaints,
@@ -15,15 +16,18 @@ import {
   rooms,
   students,
   roommates,
+  type Fee,
   type ParentNotification,
   type Role,
 } from "@/data/hms";
 import {
+  AlertCircle,
   BedDouble,
   CheckCircle2,
   Clock,
   DoorOpen,
   IndianRupee,
+  Loader2,
   Users,
   XCircle,
 } from "lucide-react";
@@ -87,11 +91,119 @@ function ActionCell({ labels }: { labels: string[] }) {
 }
 
 /* ---------------- Fees ---------------- */
+const formatDueDate = (dateStr?: string | null) => {
+  if (!dateStr) return "—";
+  try {
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+      const year = Number(parts[0]);
+      const month = Number(parts[1]) - 1;
+      const day = Number(parts[2]);
+      const d = new Date(year, month, day);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+      }
+    }
+    const d = new Date(dateStr);
+    return isNaN(d.getTime())
+      ? dateStr
+      : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  } catch {
+    return dateStr;
+  }
+};
+
 export function FeesPage({ role }: { role: Role }) {
   const [feeRows, setFeeRows] = usePersistentState("hotelsync-fees", fees);
   const [remindedFees, setRemindedFees] = useState<string[]>([]);
-  const rows = isStudent(role) ? feeRows.filter((f) => f.student === currentStudent.name) : feeRows;
-  const cols: Column<(typeof fees)[number]>[] = [
+  const [studentFees, setStudentFees] = useState<Fee[]>([]);
+  const [loading, setLoading] = useState(isStudent(role));
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchStudentFees = useCallback(async () => {
+    if (!isStudent(role)) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const supabase = getSupabaseClient();
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      const userId = session?.user?.id;
+      if (!userId) {
+        setStudentFees([]);
+        return;
+      }
+
+      const { data, error: fetchError } = await supabase
+        .from("fees")
+        .select("*")
+        .eq("user_id", userId)
+        .order("due_date");
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      const mapped: Fee[] = (data || []).map((row) => {
+        const amount = Number(row.amount ?? 0);
+        const paid = Number(row.paid ?? 0);
+        const rawDueDate = (row.due_date as string | null) ?? "";
+        const isOverdue = rawDueDate
+          ? new Date(rawDueDate + "T23:59:59").getTime() < Date.now()
+          : false;
+        const status: Fee["status"] =
+          paid >= amount && amount > 0 ? "Paid" : isOverdue ? "Overdue" : "Pending";
+
+        return {
+          id: row.id,
+          student: row.student_name ?? "",
+          rollNo: row.roll_no ?? "",
+          semester: row.semester ?? "",
+          amount,
+          paid,
+          dueDate: formatDueDate(rawDueDate),
+          status,
+          method: row.method ?? undefined,
+        };
+      });
+
+      setStudentFees(mapped);
+    } catch (err: unknown) {
+      console.error("Error fetching student fees:", err);
+      setError(err instanceof Error ? err.message : "Failed to load fee records.");
+    } finally {
+      setLoading(false);
+    }
+  }, [role]);
+
+  useEffect(() => {
+    if (!isStudent(role)) return;
+
+    void fetchStudentFees();
+
+    const supabase = getSupabaseClient();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void fetchStudentFees();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchStudentFees, role]);
+
+  const rows: Fee[] = isStudent(role) ? studentFees : feeRows;
+  const cols: Column<Fee>[] = [
     { key: "id", header: "Invoice", render: (r) => <span className="font-medium">{r.id}</span> },
     ...(isStudent(role)
       ? []
@@ -99,7 +211,7 @@ export function FeesPage({ role }: { role: Role }) {
           {
             key: "student",
             header: "Student",
-            render: (r: (typeof fees)[number]) => (
+            render: (r: Fee) => (
               <div>
                 <p className="font-medium">{r.student}</p>
                 <p className="text-xs text-muted-foreground">{r.rollNo}</p>
@@ -115,7 +227,7 @@ export function FeesPage({ role }: { role: Role }) {
       render: (r) => (
         <div className="w-28">
           <p className="mb-1 text-xs">{inr(r.paid)}</p>
-          <ProgressBar value={(r.paid / r.amount) * 100} />
+          <ProgressBar value={r.amount > 0 ? (r.paid / r.amount) * 100 : 0} />
         </div>
       ),
     },
@@ -157,8 +269,18 @@ export function FeesPage({ role }: { role: Role }) {
         ),
     },
   ];
-  const due = rows.reduce((a, f) => a + (f.amount - f.paid), 0);
+  const totalAmount = rows.reduce((a, f) => a + f.amount, 0);
   const paid = rows.reduce((a, f) => a + f.paid, 0);
+  const due = rows.reduce((a, f) => a + Math.max(0, f.amount - f.paid), 0);
+  const clearedCount = rows.filter((r) => r.status === "Paid").length;
+
+  const donutProgress = isStudent(role)
+    ? totalAmount > 0
+      ? Math.min(100, Math.round((paid / totalAmount) * 100))
+      : rows.length > 0
+        ? 100
+        : 0
+    : feeCollection.collectedPct;
 
   const handleDownload = () => {
     const filename = isStudent(role) ? "my-fee-receipts.csv" : "hostel-fee-ledger.csv";
@@ -175,32 +297,52 @@ export function FeesPage({ role }: { role: Role }) {
             : "All fee records, collection status and dues."
         }
         action={
-          <button type="button" className={btnRole} onClick={handleDownload}>
+          <button
+            type="button"
+            className={`${btnRole}${isStudent(role) && (loading || rows.length === 0) ? " cursor-not-allowed opacity-50" : ""}`}
+            onClick={handleDownload}
+            disabled={isStudent(role) && (loading || rows.length === 0)}
+          >
             {isStudent(role) ? "Download receipts" : "Export ledger"}
           </button>
         }
       />
-      <div className="mb-6 grid gap-4 lg:grid-cols-4">
-        <StatCard icon={IndianRupee} label="Paid" value={inr(paid)} />
-        <StatCard icon={Clock} label="Outstanding" value={inr(due)} />
-        <StatCard
-          icon={CheckCircle2}
-          label="Cleared invoices"
-          value={String(rows.filter((r) => r.status === "Paid").length)}
-        />
-        <Panel className="flex items-center justify-center py-2">
-          <DonutProgress
-            value={feeCollection.collectedPct}
-            label={isStudent(role) ? "of your dues cleared" : "collected"}
+      {isStudent(role) && loading ? (
+        <div className="panel flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center">
+          <Loader2 className="size-8 animate-spin text-role" />
+          <p className="text-sm font-medium text-muted-foreground">Loading fee records…</p>
+        </div>
+      ) : isStudent(role) && error ? (
+        <div className="panel flex min-h-64 flex-col items-center justify-center gap-3 border-danger/30 bg-danger/5 p-8 text-center">
+          <AlertCircle className="size-8 text-danger" />
+          <p className="font-semibold text-danger">Unable to load fee records</p>
+          <p className="max-w-md text-sm text-muted-foreground">{error}</p>
+          <button type="button" className={btnRole} onClick={() => void fetchStudentFees()}>
+            Retry
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="mb-6 grid gap-4 lg:grid-cols-4">
+            <StatCard icon={IndianRupee} label="Paid" value={inr(paid)} />
+            <StatCard icon={Clock} label="Outstanding" value={inr(due)} />
+            <StatCard icon={CheckCircle2} label="Cleared invoices" value={String(clearedCount)} />
+            <Panel className="flex items-center justify-center py-2">
+              <DonutProgress
+                value={donutProgress}
+                label={isStudent(role) ? "of your dues cleared" : "collected"}
+              />
+            </Panel>
+          </div>
+          <DataTable
+            title="Fee records"
+            rows={rows}
+            columns={cols}
+            searchKeys={["student", "id", "semester", "status"]}
+            emptyText="No fee records found"
           />
-        </Panel>
-      </div>
-      <DataTable
-        title="Fee records"
-        rows={rows}
-        columns={cols}
-        searchKeys={["student", "id", "semester", "status"]}
-      />
+        </>
+      )}
     </>
   );
 }
