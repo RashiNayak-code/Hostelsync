@@ -1282,17 +1282,134 @@ export function OutpassPage({ role }: { role: Role }) {
 }
 
 /* ---------------- Leave ---------------- */
+const formatLeaveDate = (dateStr?: string | null) => {
+  if (!dateStr) return "—";
+  try {
+    const parts = dateStr.split("-");
+    if (parts.length === 3 && parts[0].length === 4) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const d = new Date(year, month, day);
+      return d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    }
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return dateStr;
+  }
+};
+
 export function LeavePage({ role }: { role: Role }) {
   const [leaveRows, setLeaveRows] = usePersistentState("hotelsync-leaves", leaves);
+  const [studentLeaves, setStudentLeaves] = useState<(typeof leaves)[number][]>([]);
+  const [loading, setLoading] = useState(isStudent(role));
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [studentProfile, setStudentProfile] = useState<{ name: string }>({ name: "" });
+
   const [form, setForm] = useState({
     from: "",
     to: "",
     reason: "",
   });
 
-  const rows = isStudent(role)
-    ? leaveRows.filter((l) => l.student === currentStudent.name)
-    : leaveRows;
+  const fetchStudentLeaves = useCallback(async () => {
+    if (!isStudent(role)) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const supabase = getSupabaseClient();
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) throw sessionError;
+
+      const userId = session?.user?.id;
+      if (!userId) {
+        setStudentLeaves([]);
+        return;
+      }
+
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (profileError) {
+        console.warn("Could not fetch student profile for leave:", profileError);
+      }
+
+      const userMeta = session.user.user_metadata || {};
+      const resolvedName =
+        profileData?.full_name ||
+        (typeof userMeta.full_name === "string" && userMeta.full_name.trim()) ||
+        session.user.email?.split("@")[0] ||
+        "Student";
+
+      setStudentProfile({ name: resolvedName });
+
+      const { data, error: fetchError } = await supabase
+        .from("leave_requests")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      const mapped: (typeof leaves)[number][] = (data || []).map((row) => ({
+        id: row.id,
+        student: row.student_name ?? resolvedName,
+        from: formatLeaveDate(row.from_date),
+        to: formatLeaveDate(row.to_date),
+        reason: row.reason ?? "",
+        status: (row.status as (typeof leaves)[number]["status"]) || "Pending",
+      }));
+
+      setStudentLeaves(mapped);
+    } catch (err: unknown) {
+      console.error("Error fetching student leaves:", err);
+      setError(err instanceof Error ? err.message : "Failed to load leave applications.");
+    } finally {
+      setLoading(false);
+    }
+  }, [role]);
+
+  useEffect(() => {
+    if (!isStudent(role)) return;
+
+    void fetchStudentLeaves();
+
+    const supabase = getSupabaseClient();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void fetchStudentLeaves();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchStudentLeaves, role]);
+
+  const rows = isStudent(role) ? studentLeaves : leaveRows;
   const cols: Column<(typeof leaves)[number]>[] = [
     { key: "id", header: "Request", render: (r) => <span className="font-medium">{r.id}</span> },
     ...(isStudent(role)
@@ -1307,7 +1424,14 @@ export function LeavePage({ role }: { role: Role }) {
       header: "",
       render: (r) =>
         isStudent(role) ? (
-          <ActionCell labels={["Withdraw"]} />
+          <button
+            type="button"
+            className={`${btn} cursor-not-allowed opacity-50`}
+            disabled
+            title="Withdraw is not available for student accounts."
+          >
+            Withdraw
+          </button>
         ) : r.status === "Pending" ? (
           <div className="flex flex-wrap gap-2">
             <button
@@ -1339,34 +1463,102 @@ export function LeavePage({ role }: { role: Role }) {
     },
   ];
 
-  const handleSubmitLeave = () => {
+  const handleSubmitLeave = async () => {
     const from = form.from.trim();
     const to = form.to.trim();
     const reason = form.reason.trim();
 
     if (!from || !to || !reason) {
+      if (isStudent(role)) {
+        setSubmitError("Please fill in from date, to date, and reason.");
+      }
       return;
     }
 
-    const newLeave: (typeof leaves)[number] = {
-      id: `LV-${Date.now().toString().slice(-6)}`,
-      student: currentStudent.name,
-      from: new Date(from).toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
-      to: new Date(to).toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
-      reason,
-      status: "Pending",
-    };
+    if (isStudent(role)) {
+      if (to < from) {
+        setSubmitError("To date must not be earlier than From date.");
+        return;
+      }
 
-    setLeaveRows((prev) => [newLeave, ...prev]);
-    setForm({ from: "", to: "", reason: "" });
+      setSubmitting(true);
+      setSubmitError(null);
+
+      try {
+        const supabase = getSupabaseClient();
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        const userId = session?.user?.id;
+        if (!userId) {
+          throw new Error("You must be logged in to submit a leave application.");
+        }
+
+        let studentName = studentProfile.name;
+        if (!studentName) {
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", userId)
+            .maybeSingle();
+
+          const userMeta = session.user.user_metadata || {};
+          studentName =
+            profileData?.full_name ||
+            (typeof userMeta.full_name === "string" && userMeta.full_name.trim()) ||
+            session.user.email?.split("@")[0] ||
+            "Student";
+        }
+
+        const leaveId = `LV-${Date.now().toString().slice(-6)}`;
+        const payload = {
+          id: leaveId,
+          user_id: userId,
+          student_name: studentName,
+          from_date: from,
+          to_date: to,
+          reason,
+          status: "Pending",
+        };
+
+        const { error: insertError } = await supabase.from("leave_requests").insert(payload);
+        if (insertError) {
+          throw insertError;
+        }
+
+        await fetchStudentLeaves();
+        setForm({ from: "", to: "", reason: "" });
+      } catch (err: unknown) {
+        console.error("Error submitting leave application:", err);
+        setSubmitError(err instanceof Error ? err.message : "Failed to submit leave application.");
+      } finally {
+        setSubmitting(false);
+      }
+    } else {
+      const newLeave: (typeof leaves)[number] = {
+        id: `LV-${Date.now().toString().slice(-6)}`,
+        student: currentStudent.name,
+        from: new Date(from).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }),
+        to: new Date(to).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }),
+        reason,
+        status: "Pending",
+      };
+
+      setLeaveRows((prev) => [newLeave, ...prev]);
+      setForm({ from: "", to: "", reason: "" });
+    }
   };
 
   return (
@@ -1382,6 +1574,12 @@ export function LeavePage({ role }: { role: Role }) {
       {isStudent(role) ? (
         <Panel className="mb-6">
           <h2 className="mb-4 text-base font-semibold">Apply for leave</h2>
+          {submitError ? (
+            <div className="mb-4 flex items-center gap-2 rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger">
+              <AlertCircle className="size-4 shrink-0" />
+              <span>{submitError}</span>
+            </div>
+          ) : null}
           <div className="grid gap-4 md:grid-cols-3">
             <label className="text-sm">
               <span className="mb-1.5 block text-muted-foreground">From</span>
@@ -1411,17 +1609,42 @@ export function LeavePage({ role }: { role: Role }) {
               />
             </label>
           </div>
-          <button type="button" className={btnRole + " mt-4"} onClick={handleSubmitLeave}>
-            Submit application
+          <button
+            type="button"
+            className={btnRole + " mt-4"}
+            onClick={handleSubmitLeave}
+            disabled={submitting || !form.from || !form.to || !form.reason.trim()}
+          >
+            {submitting ? "Submitting…" : "Submit application"}
           </button>
         </Panel>
       ) : null}
-      <DataTable
-        title="Leave applications"
-        rows={rows}
-        columns={cols}
-        searchKeys={["student", "reason", "status", "id"]}
-      />
+
+      {isStudent(role) && loading ? (
+        <div className="panel flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center">
+          <Loader2 className="size-8 animate-spin text-role" />
+          <p className="text-sm font-medium text-muted-foreground">
+            Loading your leave applications…
+          </p>
+        </div>
+      ) : isStudent(role) && error ? (
+        <div className="panel flex min-h-64 flex-col items-center justify-center gap-3 border-danger/30 bg-danger/5 p-8 text-center">
+          <AlertCircle className="size-8 text-danger" />
+          <p className="font-semibold text-danger">Unable to load leave applications</p>
+          <p className="max-w-md text-sm text-muted-foreground">{error}</p>
+          <button type="button" className={btnRole} onClick={() => void fetchStudentLeaves()}>
+            Retry
+          </button>
+        </div>
+      ) : (
+        <DataTable
+          title="Leave applications"
+          rows={rows}
+          columns={cols}
+          searchKeys={["student", "reason", "status", "id"]}
+          emptyText="No leave applications found"
+        />
+      )}
     </>
   );
 }
