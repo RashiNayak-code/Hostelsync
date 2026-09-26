@@ -16,6 +16,7 @@ import {
   rooms,
   students,
   roommates,
+  type Complaint,
   type Fee,
   type ParentNotification,
   type Role,
@@ -348,14 +349,121 @@ export function FeesPage({ role }: { role: Role }) {
 }
 
 /* ---------------- Complaints ---------------- */
+const formatRaisedAt = (dateStr?: string | null) => {
+  if (!dateStr) return "—";
+  const d = new Date(dateStr);
+  return isNaN(d.getTime())
+    ? dateStr
+    : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+};
+
 export function ComplaintsPage({ role }: { role: Role }) {
   const [complaintRows, setComplaintRows] = usePersistentState("hotelsync-complaints", complaints);
+  const [studentComplaints, setStudentComplaints] = useState<Complaint[]>([]);
+  const [loading, setLoading] = useState(isStudent(role));
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [currentStudentProfile, setCurrentStudentProfile] = useState<{
+    name: string;
+    roomNo: string;
+  }>({ name: "", roomNo: "" });
+
   const [form, setForm] = useState({
-    category: "Water" as (typeof complaints)[number]["category"],
-    roomNo: currentStudent.roomNo,
+    category: "Water" as Complaint["category"],
+    roomNo: "",
     priority: "Normal",
     description: "",
   });
+
+  const formRef = useRef<HTMLDivElement>(null);
+
+  const fetchStudentComplaints = useCallback(async () => {
+    if (!isStudent(role)) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const supabase = getSupabaseClient();
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      const userId = session?.user?.id;
+      if (!userId) {
+        setStudentComplaints([]);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, room_no")
+        .eq("id", userId)
+        .maybeSingle();
+
+      const userMeta = (session?.user?.user_metadata ?? {}) as Record<string, unknown>;
+      const resolvedName =
+        profile?.full_name ||
+        (typeof userMeta.full_name === "string" && userMeta.full_name.trim()) ||
+        session?.user?.email?.split("@")[0] ||
+        "Student";
+      const resolvedRoom =
+        profile?.room_no || (typeof userMeta.room_no === "string" && userMeta.room_no.trim()) || "";
+
+      setCurrentStudentProfile({ name: resolvedName, roomNo: resolvedRoom });
+      setForm((prev) => ({ ...prev, roomNo: prev.roomNo || resolvedRoom }));
+
+      const { data, error: fetchError } = await supabase
+        .from("complaints")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      const mapped: Complaint[] = (data || []).map((row) => ({
+        id: row.id,
+        student: row.student_name ?? resolvedName,
+        roomNo: row.room_no ?? resolvedRoom,
+        category: (row.category as Complaint["category"]) || "Other",
+        description: row.description ?? "",
+        status: (row.status as Complaint["status"]) || "Pending",
+        raisedAt: formatRaisedAt(row.created_at),
+      }));
+
+      setStudentComplaints(mapped);
+    } catch (err: unknown) {
+      console.error("Error fetching student complaints:", err);
+      setError(err instanceof Error ? err.message : "Failed to load complaints.");
+    } finally {
+      setLoading(false);
+    }
+  }, [role]);
+
+  useEffect(() => {
+    if (!isStudent(role)) return;
+
+    void fetchStudentComplaints();
+
+    const supabase = getSupabaseClient();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void fetchStudentComplaints();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchStudentComplaints, role]);
 
   const handleExportComplaints = () => {
     const headers = ["Ticket", "Student", "Room", "Category", "Description", "Raised", "Status"];
@@ -386,17 +494,15 @@ export function ComplaintsPage({ role }: { role: Role }) {
     URL.revokeObjectURL(url);
   };
 
-  const rows = isStudent(role)
-    ? complaintRows.filter((c) => c.student === currentStudent.name)
-    : complaintRows;
-  const cols: Column<(typeof complaints)[number]>[] = [
+  const rows: Complaint[] = isStudent(role) ? studentComplaints : complaintRows;
+  const cols: Column<Complaint>[] = [
     { key: "id", header: "Ticket", render: (r) => <span className="font-medium">{r.id}</span> },
     ...(role === "admin"
       ? [
           {
             key: "student",
             header: "Student",
-            render: (r: (typeof complaints)[number]) => (
+            render: (r: Complaint) => (
               <div>
                 <p className="font-medium">{r.student}</p>
                 <p className="text-xs text-muted-foreground">Room {r.roomNo}</p>
@@ -452,33 +558,98 @@ export function ComplaintsPage({ role }: { role: Role }) {
     },
   ];
 
-  const handleSubmitComplaint = () => {
+  const handleSubmitComplaint = async () => {
     const description = form.description.trim();
     if (!description) {
       return;
     }
 
-    const newComplaint: (typeof complaints)[number] = {
-      id: `CMP-${Date.now().toString().slice(-6)}`,
-      student: currentStudent.name,
-      roomNo: form.roomNo,
-      category: form.category,
-      description,
-      status: "Pending",
-      raisedAt: new Date().toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
-    };
+    if (isStudent(role)) {
+      setSubmitting(true);
+      setSubmitError(null);
 
-    setComplaintRows((prev) => [newComplaint, ...prev]);
-    setForm({
-      category: "Water",
-      roomNo: currentStudent.roomNo,
-      priority: "Normal",
-      description: "",
-    });
+      try {
+        const supabase = getSupabaseClient();
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        const userId = session?.user?.id;
+        if (!userId) {
+          throw new Error("You must be logged in to submit a complaint.");
+        }
+
+        const ticketId = `CMP-${Date.now().toString().slice(-6)}`;
+        const nowIso = new Date().toISOString();
+        const studentName =
+          currentStudentProfile.name || session.user.email?.split("@")[0] || "Student";
+        const roomNo = form.roomNo.trim() || currentStudentProfile.roomNo || null;
+
+        const payload = {
+          id: ticketId,
+          user_id: userId,
+          student_name: studentName,
+          room_no: roomNo,
+          category: form.category,
+          description,
+          status: "Pending",
+          created_at: nowIso,
+        };
+
+        const { error: insertError } = await supabase.from("complaints").insert(payload);
+        if (insertError) {
+          throw insertError;
+        }
+
+        const newComplaint: Complaint = {
+          id: ticketId,
+          student: studentName,
+          roomNo: roomNo ?? "",
+          category: form.category,
+          description,
+          status: "Pending",
+          raisedAt: formatRaisedAt(nowIso),
+        };
+
+        setStudentComplaints((prev) => [newComplaint, ...prev]);
+        setForm((prev) => ({
+          category: "Water",
+          roomNo: prev.roomNo,
+          priority: "Normal",
+          description: "",
+        }));
+      } catch (err: unknown) {
+        console.error("Error submitting complaint:", err);
+        setSubmitError(err instanceof Error ? err.message : "Failed to submit complaint.");
+      } finally {
+        setSubmitting(false);
+      }
+    } else {
+      const newComplaint: Complaint = {
+        id: `CMP-${Date.now().toString().slice(-6)}`,
+        student: currentStudent.name,
+        roomNo: form.roomNo,
+        category: form.category,
+        description,
+        status: "Pending",
+        raisedAt: new Date().toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }),
+      };
+
+      setComplaintRows((prev) => [newComplaint, ...prev]);
+      setForm({
+        category: "Water",
+        roomNo: currentStudent.roomNo,
+        priority: "Normal",
+        description: "",
+      });
+    }
   };
 
   return (
@@ -494,7 +665,11 @@ export function ComplaintsPage({ role }: { role: Role }) {
           <button
             type="button"
             className={btnRole}
-            onClick={isStudent(role) ? undefined : handleExportComplaints}
+            onClick={
+              isStudent(role)
+                ? () => formRef.current?.scrollIntoView({ behavior: "smooth" })
+                : handleExportComplaints
+            }
           >
             {isStudent(role) ? "Raise complaint" : "Export list"}
           </button>
@@ -502,68 +677,102 @@ export function ComplaintsPage({ role }: { role: Role }) {
       />
       {isStudent(role) ? (
         <Panel className="mb-6">
-          <h2 className="mb-4 text-base font-semibold">New complaint</h2>
-          <div className="grid gap-4 md:grid-cols-3">
-            <label className="text-sm">
-              <span className="mb-1.5 block text-muted-foreground">Category</span>
-              <select
-                value={form.category}
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    category: event.target.value as (typeof complaints)[number]["category"],
-                  }))
-                }
-                className="h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
-              >
-                {["Water", "Electricity", "Mess", "WiFi", "Furniture", "Other"].map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </label>
-            <label className="text-sm">
-              <span className="mb-1.5 block text-muted-foreground">Room no.</span>
-              <input
-                value={form.roomNo}
-                onChange={(event) => setForm((prev) => ({ ...prev, roomNo: event.target.value }))}
-                className="h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
-              />
-            </label>
-            <label className="text-sm md:col-span-1">
-              <span className="mb-1.5 block text-muted-foreground">Priority</span>
-              <select
-                value={form.priority}
-                onChange={(event) => setForm((prev) => ({ ...prev, priority: event.target.value }))}
-                className="h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
-              >
-                <option>Normal</option>
-                <option>Urgent</option>
-              </select>
-            </label>
-            <label className="text-sm md:col-span-3">
-              <span className="mb-1.5 block text-muted-foreground">Description</span>
-              <textarea
-                rows={3}
-                value={form.description}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, description: event.target.value }))
-                }
-                placeholder="Describe the issue…"
-                className="w-full rounded-lg border border-input bg-background/60 p-3 text-sm outline-none focus:border-role"
-              />
-            </label>
+          <div ref={formRef}>
+            <h2 className="mb-4 text-base font-semibold">New complaint</h2>
+            {submitError ? (
+              <div className="mb-4 flex items-center gap-2 rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger">
+                <AlertCircle className="size-4 shrink-0" />
+                <span>{submitError}</span>
+              </div>
+            ) : null}
+            <div className="grid gap-4 md:grid-cols-3">
+              <label className="text-sm">
+                <span className="mb-1.5 block text-muted-foreground">Category</span>
+                <select
+                  value={form.category}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      category: event.target.value as Complaint["category"],
+                    }))
+                  }
+                  className="h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
+                >
+                  {["Water", "Electricity", "Mess", "WiFi", "Furniture", "Other"].map((c) => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm">
+                <span className="mb-1.5 block text-muted-foreground">Room no.</span>
+                <input
+                  value={form.roomNo}
+                  onChange={(event) => setForm((prev) => ({ ...prev, roomNo: event.target.value }))}
+                  placeholder="e.g. B-204"
+                  className="h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
+                />
+              </label>
+              <label className="text-sm md:col-span-1">
+                <span className="mb-1.5 block text-muted-foreground">Priority</span>
+                <select
+                  value={form.priority}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, priority: event.target.value }))
+                  }
+                  className="h-10 w-full rounded-lg border border-input bg-background/60 px-3 text-sm outline-none focus:border-role"
+                >
+                  <option>Normal</option>
+                  <option>Urgent</option>
+                </select>
+              </label>
+              <label className="text-sm md:col-span-3">
+                <span className="mb-1.5 block text-muted-foreground">Description</span>
+                <textarea
+                  rows={3}
+                  value={form.description}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, description: event.target.value }))
+                  }
+                  placeholder="Describe the issue…"
+                  className="w-full rounded-lg border border-input bg-background/60 p-3 text-sm outline-none focus:border-role"
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              className={btnRole + " mt-4"}
+              onClick={handleSubmitComplaint}
+              disabled={submitting || !form.description.trim()}
+            >
+              {submitting ? "Submitting…" : "Submit complaint"}
+            </button>
           </div>
-          <button type="button" className={btnRole + " mt-4"} onClick={handleSubmitComplaint}>
-            Submit complaint
-          </button>
         </Panel>
       ) : null}
-      <DataTable
-        title="Complaint tickets"
-        rows={rows}
-        columns={cols}
-        searchKeys={["student", "category", "status", "id"]}
-      />
+
+      {isStudent(role) && loading ? (
+        <div className="panel flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center">
+          <Loader2 className="size-8 animate-spin text-role" />
+          <p className="text-sm font-medium text-muted-foreground">Loading your complaints…</p>
+        </div>
+      ) : isStudent(role) && error ? (
+        <div className="panel flex min-h-64 flex-col items-center justify-center gap-3 border-danger/30 bg-danger/5 p-8 text-center">
+          <AlertCircle className="size-8 text-danger" />
+          <p className="font-semibold text-danger">Unable to load complaints</p>
+          <p className="max-w-md text-sm text-muted-foreground">{error}</p>
+          <button type="button" className={btnRole} onClick={() => void fetchStudentComplaints()}>
+            Retry
+          </button>
+        </div>
+      ) : (
+        <DataTable
+          title="Complaint tickets"
+          rows={rows}
+          columns={cols}
+          searchKeys={["category", "status", "id"]}
+          emptyText="No complaints found"
+        />
+      )}
     </>
   );
 }
