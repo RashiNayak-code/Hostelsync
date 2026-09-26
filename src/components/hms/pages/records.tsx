@@ -777,6 +777,23 @@ export function ComplaintsPage({ role }: { role: Role }) {
 }
 
 /* ---------------- Outpass ---------------- */
+const formatOutpassDateTime = (isoOrDateStr?: string | null) => {
+  if (!isoOrDateStr) return "—";
+  try {
+    const d = new Date(isoOrDateStr);
+    if (isNaN(d.getTime())) return isoOrDateStr;
+    return d.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return isoOrDateStr;
+  }
+};
+
 export function OutpassPage({ role }: { role: Role }) {
   const [outpassRows, setOutpassRows] = usePersistentState("hotelsync-outpasses", outpasses);
   const [studentRows] = usePersistentState("hotelsync-students", students);
@@ -784,11 +801,111 @@ export function OutpassPage({ role }: { role: Role }) {
     "hotelsync-parent-notifications",
     [],
   );
+  const [studentOutpasses, setStudentOutpasses] = useState<(typeof outpasses)[number][]>([]);
+  const [loading, setLoading] = useState(isStudent(role));
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [studentProfile, setStudentProfile] = useState<{ name: string; rollNo: string }>({
+    name: "",
+    rollNo: "",
+  });
+
   const [form, setForm] = useState({
     departure: "",
     expectedReturn: "",
     reason: "",
   });
+
+  const fetchStudentOutpasses = useCallback(async () => {
+    if (!isStudent(role)) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const supabase = getSupabaseClient();
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) throw sessionError;
+
+      const userId = session?.user?.id;
+      if (!userId) {
+        setStudentOutpasses([]);
+        return;
+      }
+
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("full_name, roll_no")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (profileError) {
+        console.warn("Could not fetch student profile for outpass:", profileError);
+      }
+
+      const userMeta = session.user.user_metadata || {};
+      const resolvedName =
+        profileData?.full_name ||
+        (typeof userMeta.full_name === "string" && userMeta.full_name.trim()) ||
+        session.user.email?.split("@")[0] ||
+        "Student";
+      const resolvedRollNo =
+        profileData?.roll_no ||
+        (typeof userMeta.roll_no === "string" && userMeta.roll_no.trim()) ||
+        "";
+
+      setStudentProfile({ name: resolvedName, rollNo: resolvedRollNo });
+
+      const { data, error: fetchError } = await supabase
+        .from("outpasses")
+        .select("*")
+        .eq("user_id", userId)
+        .order("departure", { ascending: false });
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      const mapped: (typeof outpasses)[number][] = (data || []).map((row) => ({
+        id: row.id,
+        student: row.student_name ?? resolvedName,
+        rollNo: row.roll_no ?? resolvedRollNo,
+        reason: row.reason ?? "",
+        departure: formatOutpassDateTime(row.departure),
+        expectedReturn: formatOutpassDateTime(row.expected_return),
+        status: (row.status as (typeof outpasses)[number]["status"]) || "Pending",
+      }));
+
+      setStudentOutpasses(mapped);
+    } catch (err: unknown) {
+      console.error("Error fetching student outpasses:", err);
+      setError(err instanceof Error ? err.message : "Failed to load outpass requests.");
+    } finally {
+      setLoading(false);
+    }
+  }, [role]);
+
+  useEffect(() => {
+    if (!isStudent(role)) return;
+
+    void fetchStudentOutpasses();
+
+    const supabase = getSupabaseClient();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void fetchStudentOutpasses();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchStudentOutpasses, role]);
 
   const handleExportOutpasses = () => {
     const headers = [
@@ -827,9 +944,7 @@ export function OutpassPage({ role }: { role: Role }) {
     URL.revokeObjectURL(url);
   };
 
-  const rows = isStudent(role)
-    ? outpassRows.filter((o) => o.student === currentStudent.name)
-    : outpassRows;
+  const rows = isStudent(role) ? studentOutpasses : outpassRows;
 
   const handleOutpassDecision = (outpassId: string, status: "Approved" | "Rejected") => {
     const outpass = outpassRows.find((item) => item.id === outpassId);
@@ -909,8 +1024,9 @@ export function OutpassPage({ role }: { role: Role }) {
         isStudent(role) ? (
           <button
             type="button"
-            className={btn}
-            onClick={() => setOutpassRows((prev) => prev.filter((item) => item.id !== r.id))}
+            className={`${btn} cursor-not-allowed opacity-50`}
+            disabled
+            title="Outpass cancellation is not available once submitted"
           >
             Cancel
           </button>
@@ -951,39 +1067,119 @@ export function OutpassPage({ role }: { role: Role }) {
     },
   ];
 
-  const handleSubmitOutpass = () => {
+  const handleSubmitOutpass = async () => {
     const reason = form.reason.trim();
     const departure = form.departure.trim();
     const expectedReturn = form.expectedReturn.trim();
 
     if (!reason || !departure || !expectedReturn) {
+      if (isStudent(role)) {
+        setSubmitError("Please fill in departure, expected return, and reason.");
+      }
       return;
     }
 
-    const newOutpass: (typeof outpasses)[number] = {
-      id: `OP-${Date.now().toString().slice(-6)}`,
-      student: currentStudent.name,
-      rollNo: currentStudent.rollNo,
-      reason,
-      departure: new Date(departure).toLocaleString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      expectedReturn: new Date(expectedReturn).toLocaleString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      status: "Pending",
-    };
+    if (isStudent(role)) {
+      setSubmitting(true);
+      setSubmitError(null);
 
-    setOutpassRows((prev) => [newOutpass, ...prev]);
-    setForm({ departure: "", expectedReturn: "", reason: "" });
+      try {
+        const departureDate = new Date(departure);
+        const returnDate = new Date(expectedReturn);
+
+        if (isNaN(departureDate.getTime()) || isNaN(returnDate.getTime())) {
+          throw new Error("Please provide valid departure and return dates.");
+        }
+        if (returnDate <= departureDate) {
+          throw new Error("Expected return must be after departure time.");
+        }
+
+        const supabase = getSupabaseClient();
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        const userId = session?.user?.id;
+        if (!userId) {
+          throw new Error("You must be logged in to submit an outpass request.");
+        }
+
+        let studentName = studentProfile.name;
+        let rollNo = studentProfile.rollNo;
+
+        if (!studentName) {
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("full_name, roll_no")
+            .eq("id", userId)
+            .maybeSingle();
+
+          const userMeta = session.user.user_metadata || {};
+          studentName =
+            profileData?.full_name ||
+            (typeof userMeta.full_name === "string" && userMeta.full_name.trim()) ||
+            session.user.email?.split("@")[0] ||
+            "Student";
+          rollNo =
+            profileData?.roll_no ||
+            (typeof userMeta.roll_no === "string" && userMeta.roll_no.trim()) ||
+            "";
+        }
+
+        const outpassId = `OP-${Date.now().toString().slice(-6)}`;
+        const payload = {
+          id: outpassId,
+          user_id: userId,
+          student_name: studentName,
+          roll_no: rollNo || null,
+          reason,
+          departure: departureDate.toISOString(),
+          expected_return: returnDate.toISOString(),
+          status: "Pending",
+        };
+
+        const { error: insertError } = await supabase.from("outpasses").insert(payload);
+        if (insertError) {
+          throw insertError;
+        }
+
+        await fetchStudentOutpasses();
+        setForm({ departure: "", expectedReturn: "", reason: "" });
+      } catch (err: unknown) {
+        console.error("Error submitting outpass request:", err);
+        setSubmitError(err instanceof Error ? err.message : "Failed to submit outpass request.");
+      } finally {
+        setSubmitting(false);
+      }
+    } else {
+      const newOutpass: (typeof outpasses)[number] = {
+        id: `OP-${Date.now().toString().slice(-6)}`,
+        student: currentStudent.name,
+        rollNo: currentStudent.rollNo,
+        reason,
+        departure: new Date(departure).toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        expectedReturn: new Date(expectedReturn).toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        status: "Pending",
+      };
+
+      setOutpassRows((prev) => [newOutpass, ...prev]);
+      setForm({ departure: "", expectedReturn: "", reason: "" });
+    }
   };
 
   return (
@@ -1006,6 +1202,12 @@ export function OutpassPage({ role }: { role: Role }) {
       {isStudent(role) ? (
         <Panel className="mb-6">
           <h2 className="mb-4 text-base font-semibold">New outpass</h2>
+          {submitError ? (
+            <div className="mb-4 flex items-center gap-2 rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger">
+              <AlertCircle className="size-4 shrink-0" />
+              <span>{submitError}</span>
+            </div>
+          ) : null}
           <div className="grid gap-4 md:grid-cols-3">
             <label className="text-sm">
               <span className="mb-1.5 block text-muted-foreground">Departure</span>
@@ -1039,17 +1241,42 @@ export function OutpassPage({ role }: { role: Role }) {
               />
             </label>
           </div>
-          <button type="button" className={btnRole + " mt-4"} onClick={handleSubmitOutpass}>
-            Submit request
+          <button
+            type="button"
+            className={btnRole + " mt-4"}
+            onClick={handleSubmitOutpass}
+            disabled={submitting || !form.departure || !form.expectedReturn || !form.reason.trim()}
+          >
+            {submitting ? "Submitting…" : "Submit request"}
           </button>
         </Panel>
       ) : null}
-      <DataTable
-        title="Outpass history"
-        rows={rows}
-        columns={cols}
-        searchKeys={["student", "reason", "status", "id"]}
-      />
+
+      {isStudent(role) && loading ? (
+        <div className="panel flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center">
+          <Loader2 className="size-8 animate-spin text-role" />
+          <p className="text-sm font-medium text-muted-foreground">
+            Loading your outpass requests…
+          </p>
+        </div>
+      ) : isStudent(role) && error ? (
+        <div className="panel flex min-h-64 flex-col items-center justify-center gap-3 border-danger/30 bg-danger/5 p-8 text-center">
+          <AlertCircle className="size-8 text-danger" />
+          <p className="font-semibold text-danger">Unable to load outpass requests</p>
+          <p className="max-w-md text-sm text-muted-foreground">{error}</p>
+          <button type="button" className={btnRole} onClick={() => void fetchStudentOutpasses()}>
+            Retry
+          </button>
+        </div>
+      ) : (
+        <DataTable
+          title="Outpass history"
+          rows={rows}
+          columns={cols}
+          searchKeys={["student", "reason", "status", "id"]}
+          emptyText="No outpass requests found"
+        />
+      )}
     </>
   );
 }
