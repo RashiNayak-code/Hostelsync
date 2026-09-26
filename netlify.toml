@@ -5,4 +5,4 @@
 [build.environment]
   NODE_VERSION = "22"
   VITE_SUPABASE_URL = "https://bnzqazhmkbbaxsoalaii.supabase.co"
-  VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_XBaf4v3g-3fallfSQf3oNw_4TpuvZs7"
+  VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_XBaf4v3g-3fallfSQf3oNw_4TpuvZs7"
