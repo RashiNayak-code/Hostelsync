@@ -15,7 +15,6 @@ import {
   outpasses,
   rooms,
   students,
-  roommates,
   type Complaint,
   type Fee,
   type ParentNotification,
@@ -1950,58 +1949,217 @@ export function RoomsPage({ role }: { role: Role }) {
 }
 
 /* ---------------- Student room allocation ---------------- */
+interface StudentProfileRoomData {
+  room_no: string | null;
+  block: string | null;
+  floor: string | null;
+  date_of_joining: string | null;
+}
+
+interface RoomRecordData {
+  room_no: string;
+  block: string;
+  floor: string;
+  capacity: number;
+  occupied: number;
+  status: string;
+}
+
+const formatAllottedDate = (dateStr?: string | null) => {
+  if (!dateStr) return "—";
+  try {
+    const trimmed = dateStr.trim();
+    if (!trimmed) return "—";
+    const parts = trimmed.split("-");
+    if (parts.length === 3) {
+      const year = Number(parts[0]);
+      const month = Number(parts[1]) - 1;
+      const day = Number(parts[2]);
+      const d = new Date(year, month, day);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      }
+    }
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    }
+    return trimmed;
+  } catch {
+    return dateStr;
+  }
+};
+
 export function MyRoomPage() {
+  const [profile, setProfile] = useState<StudentProfileRoomData | null>(null);
+  const [room, setRoom] = useState<RoomRecordData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchRoomAllocation = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const supabase = getSupabaseClient();
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      const userId = session?.user?.id;
+      if (!userId) {
+        setProfile(null);
+        setRoom(null);
+        return;
+      }
+
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("room_no, block, floor, date_of_joining")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      const typedProfile = profileData as StudentProfileRoomData | null;
+      setProfile(typedProfile);
+
+      const roomNo = typedProfile?.room_no?.trim();
+      if (roomNo) {
+        const { data: roomData, error: roomError } = await supabase
+          .from("rooms")
+          .select("room_no, block, floor, capacity, occupied, status")
+          .eq("room_no", roomNo)
+          .maybeSingle();
+
+        if (roomError) {
+          throw roomError;
+        }
+
+        setRoom((roomData as RoomRecordData | null) ?? null);
+      } else {
+        setRoom(null);
+      }
+    } catch (err: unknown) {
+      console.error("Error fetching student room allocation:", err);
+      setError(err instanceof Error ? err.message : "Failed to load room allocation.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchRoomAllocation();
+
+    const supabase = getSupabaseClient();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void fetchRoomAllocation();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchRoomAllocation]);
+
+  const roomNo = room?.room_no || profile?.room_no?.trim() || null;
+  const block = room?.block || profile?.block || "—";
+  const floor = room?.floor || profile?.floor || "—";
+  const capacity =
+    room?.capacity != null ? `${room.capacity} ${room.capacity === 1 ? "bed" : "beds"}` : "—";
+  const allottedOn = formatAllottedDate(profile?.date_of_joining);
+
   return (
     <>
       <PageHeader title="Room Allocation" description="Your allotted room and roommates." />
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Panel className="lg:col-span-1">
-          <p className="text-xs tracking-wide text-muted-foreground uppercase">Allotted room</p>
-          <p className="mt-2 text-4xl font-bold text-role">{currentStudent.roomNo}</p>
-          <dl className="mt-5 space-y-3 text-sm">
-            {[
-              ["Block", currentStudent.block],
-              ["Floor", currentStudent.floor],
-              ["Capacity", "3 beds"],
-              ["Allotted on", currentStudent.dateOfJoining],
-            ].map(([k, v]) => (
-              <div key={k} className="flex justify-between border-b border-border/60 pb-2">
-                <dt className="text-muted-foreground">{k}</dt>
-                <dd className="font-medium">{v}</dd>
-              </div>
-            ))}
-          </dl>
-          <button className={btnRole + " mt-5 w-full justify-center"}>Request room change</button>
-        </Panel>
-        <Panel className="lg:col-span-2">
-          <h2 className="mb-4 text-base font-semibold">Roommates</h2>
-          <div className="space-y-3">
-            {roommates.map((m) => (
-              <div
-                key={m.rollNo}
-                className="flex items-center gap-3 rounded-xl border border-border p-3"
-              >
-                <span className="flex size-10 items-center justify-center rounded-full bg-role/20 font-semibold text-role">
-                  {m.name.charAt(0)}
-                </span>
-                <div className="min-w-0">
-                  <p className="font-medium">{m.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {m.rollNo} · {m.course}
-                  </p>
-                </div>
-                <span className="ml-auto text-sm text-muted-foreground">{m.phone}</span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-5 rounded-xl border border-border bg-role-soft p-4 text-sm">
+      {loading ? (
+        <div className="panel flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center">
+          <Loader2 className="size-8 animate-spin text-role" />
+          <p className="text-sm font-medium text-muted-foreground">Loading room allocation…</p>
+        </div>
+      ) : error ? (
+        <div className="panel flex min-h-64 flex-col items-center justify-center gap-3 border-danger/30 bg-danger/5 p-8 text-center">
+          <AlertCircle className="size-8 text-danger" />
+          <p className="font-semibold text-danger">Unable to load room allocation</p>
+          <p className="max-w-md text-sm text-muted-foreground">{error}</p>
+          <button type="button" className={btnRole} onClick={() => void fetchRoomAllocation()}>
+            Retry
+          </button>
+        </div>
+      ) : !roomNo ? (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Panel className="flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center lg:col-span-3">
+            <BedDouble className="size-10 text-muted-foreground/60" />
+            <p className="text-lg font-semibold">No room currently allotted</p>
+            <p className="max-w-md text-sm text-muted-foreground">
+              You do not have a room assigned yet. Please contact your hostel warden or
+              administrator.
+            </p>
+          </Panel>
+          <div className="rounded-xl border border-border bg-role-soft p-4 text-sm lg:col-span-3">
             <p className="font-medium">Room rules</p>
             <p className="mt-1 text-muted-foreground">
               Lights out by 11:30 PM · No cooking appliances · Report damages within 24 hours.
             </p>
           </div>
-        </Panel>
-      </div>
+        </div>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Panel className="lg:col-span-1">
+            <p className="text-xs tracking-wide text-muted-foreground uppercase">Allotted room</p>
+            <p className="mt-2 text-4xl font-bold text-role">{roomNo}</p>
+            <dl className="mt-5 space-y-3 text-sm">
+              {[
+                ["Block", block],
+                ["Floor", floor],
+                ["Capacity", capacity],
+                ...(room?.occupied != null ? [["Occupied", `${room.occupied} beds`]] : []),
+                ...(room?.status ? [["Status", room.status]] : []),
+                ["Allotted on", allottedOn],
+              ].map(([k, v]) => (
+                <div key={k} className="flex justify-between border-b border-border/60 pb-2">
+                  <dt className="text-muted-foreground">{k}</dt>
+                  <dd className="font-medium">{v}</dd>
+                </div>
+              ))}
+            </dl>
+            <button type="button" className={btnRole + " mt-5 w-full justify-center"}>
+              Request room change
+            </button>
+          </Panel>
+          <Panel className="lg:col-span-2">
+            <h2 className="mb-4 text-base font-semibold">Roommates</h2>
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 bg-muted/20 p-8 text-center">
+              <Users className="size-8 text-muted-foreground/60" />
+              <p className="mt-2 text-sm font-medium text-muted-foreground">
+                Roommate information unavailable
+              </p>
+            </div>
+            <div className="mt-5 rounded-xl border border-border bg-role-soft p-4 text-sm">
+              <p className="font-medium">Room rules</p>
+              <p className="mt-1 text-muted-foreground">
+                Lights out by 11:30 PM · No cooking appliances · Report damages within 24 hours.
+              </p>
+            </div>
+          </Panel>
+        </div>
+      )}
     </>
   );
 }
